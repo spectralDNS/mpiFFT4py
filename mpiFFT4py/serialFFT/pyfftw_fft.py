@@ -8,7 +8,7 @@ __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
            'fftfreq', 'empty', 'zeros']
 
 import pyfftw
-from numpy import zeros as npzeros
+from numpy import iscomplexobj, zeros_like, zeros as npzeros
 from numpy.fft import fftfreq
 
 nthreads = 1
