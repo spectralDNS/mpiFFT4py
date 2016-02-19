@@ -46,7 +46,7 @@ install:
     - python setup.py install
     - which python
     
-script: cd $PWD/tests; py.test
+script: cd $PWD/tests; mpirun -np 8 py.test
 
 #notifications:
 #  email: false
