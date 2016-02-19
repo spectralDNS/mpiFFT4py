@@ -22,7 +22,7 @@ cache:
 
 before_install:
     - sudo apt-get update -q
-    - sh ./tests/install-mpi.sh $MPI
+    #- sh ./tests/install-mpi.sh $MPI
     
 install:
     # We do this conditionally because it saves us some downloading if the
