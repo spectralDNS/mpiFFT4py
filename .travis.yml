@@ -46,7 +46,6 @@ install:
     - python setup.py install
     - which python
     
-
 script: cd $PWD/tests; py.test
 
 #notifications:
