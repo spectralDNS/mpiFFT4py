@@ -9,7 +9,11 @@ import numpy as np
 def transpose_x(U_send, Uc_hatT, num_processes, Np):
     # Align data in x-direction
     for i in range(num_processes): 
-        U_send[i] = Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2]
+       U_send[i] = Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2]
+    
+    #sx = U_send.shape
+    #sy = Uc_hatT.shape
+    #U_send = rollaxis(Uc_hatT[:,:-1].reshape(sy[0], num_processes, sx[1]), 2)
     return U_send
 
 def transpose_y(Uc_hatT, U_recv, num_processes, Np):
@@ -17,8 +21,9 @@ def transpose_y(Uc_hatT, U_recv, num_processes, Np):
         Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2] = U_recv[i*Np[0]:(i+1)*Np[0]]
     return Uc_hatT
 
+
 def swap_Nq(fft_y, fu, fft_x, N):
-    f = fu[:, 0]        
+    f = fu[:, 0].copy()        
     fft_x[0] = f[0].real
     fft_x[1:N[0]/2] = 0.5*(f[1:N[0]/2] + np.conj(f[:N[0]/2:-1]))
     fft_x[N[0]/2] = f[N[0]/2].real        
@@ -28,6 +33,7 @@ def swap_Nq(fft_y, fu, fft_x, N):
     fft_y[0] = f[0].imag
     fft_y[1:N[0]/2] = -0.5*1j*(f[1:N[0]/2] - np.conj(f[:N[0]/2:-1]))
     fft_y[N[0]/2] = f[N[0]/2].imag
+    
     fft_y[N[0]/2+1:] = np.conj(fft_y[(N[0]/2-1):0:-1])
     return fft_y
 
@@ -79,6 +85,14 @@ class FastFourierTransform(object):
         """The local shape of the complex data"""
         return (self.N[0], self.Npf)
 
+    def real_local_slice(self):
+        return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                slice(0, self.N[1]))
+    
+    def complex_local_slice(self):
+        return (slice(0, self.N[0]), 
+                slice(self.rank*self.Np[1]/2, self.rank*self.Np[1]/2+self.Npf, 1))
+        
     def get_N(self):
         return self.N
 
@@ -156,3 +170,4 @@ class FastFourierTransform(object):
         
         u[:] = irfft(self.Uc_hatT, 1)
         return u
+

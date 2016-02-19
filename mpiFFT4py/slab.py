@@ -19,7 +19,6 @@ class FastFourierTransform(object):
     """
     def __init__(self, N, L, MPI, precision, communication="alltoall"):
         self.N = N
-        self.L = L
         assert len(L) == 3
         assert len(N) == 3
         self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
@@ -30,6 +29,7 @@ class FastFourierTransform(object):
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()        
         self.Np = N / self.num_processes     
+        self.L = L.astype(float)
         
         # Initialize MPI work arrays globally
         self.Uc_hat  = np.empty(self.complex_shape(), dtype=complex)
@@ -60,8 +60,15 @@ class FastFourierTransform(object):
         """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
     
-    def get_N(self):
-        return self.N
+    def real_local_slice(self):
+        return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                slice(0, self.N[1], 1), 
+                slice(0, self.N[2], 1))
+    
+    def complex_local_slice(self):
+        return (slice(0, self.N[0], 1),
+                slice(self.rank*self.Np[1], (self.rank+1)*self.Np[1], 1),
+                slice(0, self.Nf, 1))
     
     def get_local_mesh(self):
         # Create the physical mesh

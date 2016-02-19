@@ -8,6 +8,10 @@ import numpy as np
 
 #__all__ = ['FastFourierTransform']
 
+params = {'Alignment': 'X',
+          'P1': 2,
+          'method': 'Swap'}
+
 def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1):
     #n0 = Uc_hat_z.shape[0]
     #n1 = Uc_hat_x.shape[2]
@@ -74,6 +78,7 @@ def transform_Uc_zy(Uc_hat_z, Uc_hat_y, P):
     Uc_hat_z[:, :, :-1] = np.rollaxis(Uc_hat_y.reshape((sy[0], P, sz[1], sy[2])), 1, 3).reshape((sz[0], sz[1], sz[2]-1)) 
     return Uc_hat_z
 
+
 class FastFourierTransformY(object):
     """Class for performing FFT in 3D using MPI
     
@@ -89,9 +94,10 @@ class FastFourierTransformY(object):
     
     """
 
-    def __init__(self, N, L, MPI, precision, P1=None):
+    def __init__(self, N, L, MPI, precision, P1=None, **kwargs):
+        self.params = params
+        self.params.update(kwargs)
         self.N = N
-        self.L = L
         assert len(L) == 3
         assert len(N) == 3
         self.Nf = Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
@@ -100,6 +106,7 @@ class FastFourierTransformY(object):
         self.float, self.complex, self.mpitype = float, complex, mpitype = self.types(precision)
         self.num_processes = comm.Get_size()
         assert self.num_processes > 1
+        self.L = L.astype(float)
         
         self.rank = comm.Get_rank()
         if P1 is None:
@@ -110,6 +117,9 @@ class FastFourierTransformY(object):
         self.N2 = N2 = N / P2
         self.comm0 = comm.Split(self.rank/P1)
         self.comm1 = comm.Split(self.rank%P1)
+        self.comm0_rank = self.comm0.Get_rank()
+        self.comm1_rank = self.comm1.Get_rank()
+        self.N1f = self.N1[2]/2 if self.comm0_rank < self.P1-1 else self.N1[2]/2+1
         
         if not (self.num_processes % 2 == 0 or self.num_processes == 1):
             raise IOError("Number of cpus must be even")
@@ -125,6 +135,14 @@ class FastFourierTransformY(object):
         self.Uc_hat_x  = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
         self.Uc_hat_xr = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
         self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1[2]/2), dtype=self.complex)
+        if params['method'] == 'Swap':
+            self.xy_plane = zeros((self.N[0], self.N2[1]), dtype=self.complex)
+            self.xy_plane2= zeros((self.N[0]/2+1, self.N2[1]), dtype=self.complex)
+            self.xy_recv  = zeros((self.N1[0], self.N2[1]), dtype=self.complex)
+            self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
+            self.Uc_hat_xr2= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
+            self.Uc_hat_xr3= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
+            
 
     def types(self, precision):
         return {"single": (np.float32, np.complex64, self.MPI.F_FLOAT_COMPLEX),
@@ -136,7 +154,10 @@ class FastFourierTransformY(object):
 
     def complex_shape(self):
         """The local shape of the complex data"""
-        return (self.N2[0], self.N[1], self.N1[2]/2)
+        if self.params['method'] == 'Nyquist':
+            return (self.N2[0], self.N[1], self.N1[2]/2)
+        elif self.params['method'] == 'Swap':
+            return (self.N2[0], self.N[1], self.N1f)
     
     def complex_shape_T(self):
         """The local transposed shape of the complex data"""
@@ -145,6 +166,25 @@ class FastFourierTransformY(object):
     def complex_shape_I(self):
         """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
+
+    def real_local_slice(self):
+        xzrank = self.comm0.Get_rank() # Local rank in xz-plane
+        xyrank = self.comm1.Get_rank() # Local rank in xy-plane
+        return (slice(xzrank * self.N1[0], (xzrank+1) * self.N1[0], 1),
+                slice(xyrank * self.N2[1], (xyrank+1) * self.N2[1], 1),
+                slice(0, self.N[2]))
+    
+    def complex_local_slice(self):
+        xzrank = self.comm0.Get_rank() # Local rank in xz-plane
+        xyrank = self.comm1.Get_rank() # Local rank in xy-plane
+        if self.params['method'] == 'Nyquist':
+            return (slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1),
+                    slice(0, self.N[1]),
+                    slice(xzrank*self.N1[2]/2, (xzrank+1)*self.N1[2]/2, 1))
+        elif self.params['method'] == 'Swap':
+            return (slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1),
+                    slice(0, self.N[1]),
+                    slice(xzrank*self.N1[2]/2, xzrank*self.N1[2]/2 + self.N1f, 1))
 
     #def complex_shape_padded_T(self):
         #"""The local shape of the transposed complex data padded in x and z directions"""
@@ -159,9 +199,6 @@ class FastFourierTransformY(object):
         
     def get_P(self):
         return self.P1, self.P2
-    
-    def get_N(self):
-        return self.N
     
     def get_local_mesh(self):
         xzrank = self.comm0.Get_rank() # Local rank in xz-plane
@@ -209,47 +246,113 @@ class FastFourierTransformY(object):
         """ifft in three directions using mpi.
         Need to do ifft in reversed order of fft
         """
-        # Do first owned direction
-        self.Uc_hat_y[:] = ifft(fu, axis=1)
+        if self.params['method'] == 'Nyquist':
+            # Do first owned direction
+            self.Uc_hat_y[:] = ifft(fu, axis=1)
 
-        # Transform to x all but k=N/2 (the neglected Nyquist mode)
-        self.Uc_hat_x[:] = 0
-        self.Uc_hat_x[:] = transform_Uc_xy(self.Uc_hat_x, self.Uc_hat_y, self.P2)
-            
-        # Communicate in xz-plane and do fft in x-direction
-        self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-        self.Uc_hat_x[:] = ifft(self.Uc_hat_xr, axis=0)
-            
-        # Communicate and transform in xy-plane
-        self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-        self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
+            # Transform to x all but k=N/2 (the neglected Nyquist mode)
+            self.Uc_hat_x[:] = 0
+            self.Uc_hat_x[:] = transform_Uc_xy(self.Uc_hat_x, self.Uc_hat_y, self.P2)
                 
-        # Do fft for y-direction
-        self.Uc_hat_z[:, :, -1] = 0
-        u[:] = irfft(self.Uc_hat_z, axis=2)
+            # Communicate in xz-plane and do fft in x-direction
+            self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+            self.Uc_hat_x[:] = ifft(self.Uc_hat_xr, axis=0)
+                
+            # Communicate and transform in xy-plane
+            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+            self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
+                    
+            # Do fft for y-direction
+            self.Uc_hat_z[:, :, -1] = 0
+            u[:] = irfft(self.Uc_hat_z, axis=2)
+        
+        elif self.params['method'] == 'Swap':
+            xzrank = self.comm0.Get_rank()
+            
+            # Do first owned direction
+            self.Uc_hat_y[:] = ifft(fu, axis=1)
+
+            # Transform to x
+            self.Uc_hat_xr2[:] = 0
+            self.Uc_hat_xr2[:] = transform_Uc_xy(self.Uc_hat_xr2, self.Uc_hat_y, self.P2)
+                
+            # Communicate in xz-plane and do fft in x-direction
+            self.comm1.Alltoall([self.Uc_hat_xr2, self.mpitype], [self.Uc_hat_xr3, self.mpitype])
+            self.Uc_hat_xr2[:] = ifft(self.Uc_hat_xr3, axis=0)
+            
+            self.Uc_hat_x[:] = self.Uc_hat_xr2[:, :, :self.N1[2]/2]
+            
+            # Communicate and transform in xy-plane all but k=N/2
+            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+            self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
+            
+            self.xy_plane[:] = self.Uc_hat_xr2[:, :, -1]
+            self.comm0.Scatter(self.xy_plane, self.xy_recv, root=self.P1-1)
+            self.Uc_hat_z[:, :, -1] = self.xy_recv
+            
+            # Do fft for y-direction
+            u[:] = irfft(self.Uc_hat_z, axis=2)
+
         return u
 
     def fftn(self, u, fu):
         """fft in three directions using mpi
         """
-        # Do fft in z direction on owned data
-        self.Uc_hat_z[:] = rfft(u, axis=2)
+        if self.params['method'] == 'Nyquist':
+            # Do fft in z direction on owned data
+            self.Uc_hat_z[:] = rfft(u, axis=2)
+            
+            # Transform to x direction neglecting k=N/2 (Nyquist)
+            self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
+            
+            # Communicate and do fft in x-direction
+            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+            self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)        
+            
+            # Communicate and transform to final y-direction
+            self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])  
+            self.Uc_hat_y[:] = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr, self.P2)
+                                        
+            # Do fft for last direction 
+            fu[:] = fft(self.Uc_hat_y, axis=1)
         
-        # Transform to x direction neglecting k=N/2 (Nyquist)
-        self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
-        
-        # Communicate and do fft in x-direction
-        self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-        self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)        
-        
-        # Communicate and transform to final z-direction
-        self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])  
-        self.Uc_hat_y[:] = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr, self.P2)
-                                    
-        # Do fft for last direction 
-        fu[:] = fft(self.Uc_hat_y, axis=1)
-        return fu
+        elif self.params['method'] == 'Swap':
+            # Do fft in z direction on owned data
+            self.Uc_hat_z[:] = rfft(u, axis=2)
+            
+            # Move real part of Nyquist to k=0
+            self.Uc_hat_z[:, :, 0] += 1j*self.Uc_hat_z[:, :, -1]
+            
+            # Transform to x direction neglecting k=N/2 (Nyquist)
+            self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
+            
+            # Communicate and do fft in x-direction
+            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+            self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)
+            self.Uc_hat_xr2[:, :, :self.N1[2]/2] = self.Uc_hat_x[:]
 
+            # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
+            if self.comm0_rank == 0:
+                N = self.N[0]
+                self.xy_plane[:] = self.Uc_hat_x[:, :, 0]
+                self.xy_plane2[:] = np.vstack((self.xy_plane[0].real, 0.5*(self.xy_plane[1:N/2]+np.conj(self.xy_plane[:N/2:-1])), self.xy_plane[N/2].real))
+                self.Uc_hat_xr2[:, :, 0] = np.vstack((self.xy_plane2, np.conj(self.xy_plane2[(N/2-1):0:-1])))
+                self.xy_plane2[:] = np.vstack((self.xy_plane[0].imag, -0.5*1j*(self.xy_plane[1:N/2]-np.conj(self.xy_plane[:N/2:-1])), self.xy_plane[N/2].imag))
+                self.xy_plane[:] = np.vstack((self.xy_plane2, np.conj(self.xy_plane2[(N/2-1):0:-1])))
+                self.comm0.Send([self.xy_plane, self.mpitype], dest=self.P1-1, tag=77)
+            
+            if self.comm0_rank == self.P1-1:
+                self.comm0.Recv([self.xy_plane, self.mpitype], source=0, tag=77)
+                self.Uc_hat_xr2[:, :, -1] = self.xy_plane
+            
+            # Communicate and transform to final y-direction
+            self.comm1.Alltoall([self.Uc_hat_xr2, self.mpitype], [self.Uc_hat_xr3, self.mpitype])  
+            self.Uc_hat_y = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr3, self.P2)
+            
+            # Do fft for last direction 
+            fu[:] = fft(self.Uc_hat_y, axis=1)
+
+        return fu
 
 class FastFourierTransformX(FastFourierTransformY):
     """Class for performing FFT in 3D using MPI
