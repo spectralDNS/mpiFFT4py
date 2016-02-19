@@ -120,6 +120,8 @@ class FastFourierTransformY(object):
         self.comm0_rank = self.comm0.Get_rank()
         self.comm1_rank = self.comm1.Get_rank()
         self.N1f = self.N1[2]/2 if self.comm0_rank < self.P1-1 else self.N1[2]/2+1
+        if self.params['method'] == 'Nyquist':
+            self.N1f = self.N1[2]/2
         
         if not (self.num_processes % 2 == 0 or self.num_processes == 1):
             raise IOError("Number of cpus must be even")
@@ -177,14 +179,9 @@ class FastFourierTransformY(object):
     def complex_local_slice(self):
         xzrank = self.comm0.Get_rank() # Local rank in xz-plane
         xyrank = self.comm1.Get_rank() # Local rank in xy-plane
-        if self.params['method'] == 'Nyquist':
-            return (slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1),
-                    slice(0, self.N[1]),
-                    slice(xzrank*self.N1[2]/2, (xzrank+1)*self.N1[2]/2, 1))
-        elif self.params['method'] == 'Swap':
-            return (slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1),
-                    slice(0, self.N[1]),
-                    slice(xzrank*self.N1[2]/2, xzrank*self.N1[2]/2 + self.N1f, 1))
+        return (slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1),
+                slice(0, self.N[1]),
+                slice(xzrank*self.N1[2]/2, xzrank*self.N1[2]/2 + self.N1f, 1))
 
     #def complex_shape_padded_T(self):
         #"""The local shape of the transposed complex data padded in x and z directions"""
@@ -222,7 +219,7 @@ class FastFourierTransformY(object):
         ky = fftfreq(self.N[1], 1./self.N[1]).astype(int)
         kz = fftfreq(self.N[2], 1./self.N[2]).astype(int)
         k2 = slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1)
-        k1 = slice(xzrank*self.N1[2]/2, (xzrank+1)*self.N1[2]/2, 1)
+        k1 = slice(xzrank*self.N1[2]/2, xzrank*self.N1[2]/2 + self.N1f, 1)
         K  = np.array(np.meshgrid(kx[k2], ky, kz[k1], indexing='ij'), dtype=self.float)
         return K
 
