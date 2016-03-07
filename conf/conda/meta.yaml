@@ -1,0 +1,26 @@
+package:
+  name: mpifft4py
+  version: "1.0"
+  
+source:
+  git_url: https://github.com/spectralDNS/mpiFFT4py.git
+  git_tag: master
+
+build:
+  number: 1
+
+requirements:
+  build:
+    - python
+    - cython
+
+  run:
+    - python
+    - numpy
+    - scipy
+    - mpi4py
+
+test:
+    requires:
+      - pytest
+

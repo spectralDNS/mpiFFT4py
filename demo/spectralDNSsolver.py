@@ -16,7 +16,7 @@ dt = 0.01
 N = array([2**5, 2**5, 2**5], dtype=int)
 L = array([2*pi, 2*pi, 2*pi], dtype=float)
 
-# Create an instance of the FastFourierTransform clas for performing 3D FFTs in parallel
+# Create an instance of the FastFourierTransform class for performing 3D FFTs in parallel
 # on a cube of size N points and physical size L. The mesh decomposition is performed by 
 # the FFT class using a slab decomposition. With slab decomposition the first index in real
 # physical space is shared amongst the processors, whereas in wavenumber space the second 

@@ -11,8 +11,8 @@ class FastFourierTransform(object):
     
     Slab decomposition
     
-    N - NumPy array([Nx, Ny, Nz]) setting the dimensions of the real mesh
-    L - NumPy array([Lx, Ly, Lz]) setting the actual size of the real mesh
+    N - NumPy array([Nx, Ny, Nz]) Number of nodes for the real mesh
+    L - NumPy array([Lx, Ly, Lz]) The actual size of the real mesh
     MPI - The MPI object (from mpi4py import MPI)
     precision - "single" or "double"
         

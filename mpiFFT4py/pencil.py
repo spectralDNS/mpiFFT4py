@@ -84,8 +84,8 @@ class FastFourierTransformY(object):
     
     Pencil decomposition
     
-    N - NumPy array([Nx, Ny, Nz]) setting the dimensions of the real mesh
-    L - NumPy array([Lx, Ly, Lz]) setting the actual size of the real mesh
+    N - NumPy array([Nx, Ny, Nz]) Number of nodes for the real mesh
+    L - NumPy array([Lx, Ly, Lz]) The actual size of the real mesh
     MPI - The MPI object (from mpi4py import MPI)
     precision - "single" or "double"
     
@@ -144,7 +144,6 @@ class FastFourierTransformY(object):
             self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
             self.Uc_hat_xr2= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
             self.Uc_hat_xr3= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
-            
 
     def types(self, precision):
         return {"single": (np.float32, np.complex64, self.MPI.F_FLOAT_COMPLEX),
