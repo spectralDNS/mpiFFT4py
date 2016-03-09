@@ -9,7 +9,7 @@ from mpiFFT4py.slab import FastFourierTransform as slab_FFT
 from mpiFFT4py.line import FastFourierTransform as line_FFT
 from mpiFFT4py import rfft2, rfftn, irfftn, irfft2
 
-N = 2**4
+N = 2**5
 L = array([2*pi, 2*pi, 2*pi])
 
 @pytest.fixture(params=("pencilys", "pencilyd",
@@ -41,21 +41,22 @@ def test_FFT(FFT):
     a = FFT.ifftn(c, a)
     assert allclose(a, A[FFT.real_local_slice()], 5e-7, 5e-7)
 
-#def test_FFT2(FFT2):
-    #if FFT2.rank == 0:
-        #A = random((N, N)).astype(FFT2.float)
-    #else:
-        #A = zeros((N, N), dtype=FFT2.float)
+def test_FFT2(FFT2):
+    if FFT2.rank == 0:
+        A = random((N, N)).astype(FFT2.float)        
+        
+    else:
+        A = zeros((N, N), dtype=FFT2.float)
 
-    #FFT2.comm.Bcast(A, root=0)
-    #a = zeros(FFT2.real_shape(), dtype=FFT2.float)
-    #c = zeros(FFT2.complex_shape(), dtype=FFT2.complex)
-    #a[:] = A[FFT2.real_local_slice()]
-    #c = FFT2.fft2(a, c)
-    #B2 = rfft2(A, axes=(0,1))
-    #assert allclose(c, B2[FFT2.complex_local_slice()])
-    #a = FFT2.ifft2(c, a)
-    #assert allclose(a, A[FFT2.real_local_slice()], 5e-6, 5e-6)
+    FFT2.comm.Bcast(A, root=0)
+    a = zeros(FFT2.real_shape(), dtype=FFT2.float)
+    c = zeros(FFT2.complex_shape(), dtype=FFT2.complex)
+    a[:] = A[FFT2.real_local_slice()]
+    c = FFT2.fft2(a, c)
+    B2 = rfft2(A, axes=(0,1))
+    assert allclose(c, B2[FFT2.complex_local_slice()])
+    a = FFT2.ifft2(c, a)
+    assert allclose(a, A[FFT2.real_local_slice()], 5e-7, 5e-7)
 
 #test_FFT(pencil_FFT["Y"](array([N, N, N], dtype=int), L.astype(float64), MPI, "double", 2))
 #test_FFT(pencil_FFT["Y"](array([N, N, N], dtype=int), L, MPI, "single", 2))

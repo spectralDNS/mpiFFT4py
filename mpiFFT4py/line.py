@@ -8,19 +8,22 @@ import numpy as np
 
 def transpose_x(U_send, Uc_hatT, num_processes, Np):
     # Align data in x-direction
-    for i in range(num_processes): 
-       U_send[i] = Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2]
+    #for i in range(num_processes): 
+    #   U_send[i] = Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2]
     
-    #sx = U_send.shape
-    #sy = Uc_hatT.shape
-    #U_send = rollaxis(Uc_hatT[:,:-1].reshape(sy[0], num_processes, sx[1]), 2)
+    sx = U_send.shape
+    sy = Uc_hatT.shape
+    U_send[:] = np.rollaxis(Uc_hatT[:,:-1].reshape(sy[0], num_processes, sy[0]/2), 1)
     return U_send
 
 def transpose_y(Uc_hatT, U_recv, num_processes, Np):
-    for i in range(num_processes): 
-        Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2] = U_recv[i*Np[0]:(i+1)*Np[0]]
+    #for i in range(num_processes): 
+        #Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2] = U_recv[i*Np[0]:(i+1)*Np[0]]
+        
+    sx = Uc_hatT.shape
+    sy = U_recv.shape
+    Uc_hatT[:, :-1] = np.rollaxis(U_recv.reshape(num_processes, sx[0], sy[1]), 1).reshape((sx[0], sx[1]-1))
     return Uc_hatT
-
 
 def swap_Nq(fft_y, fu, fft_x, N):
     f = fu[:, 0].copy()        
@@ -168,6 +171,6 @@ class FastFourierTransform(object):
         self.comm.Scatter(self.fft_y, self.plane_recv, root=self.num_processes-1)
         self.Uc_hatT[:, -1] = self.plane_recv
         
-        u[:] = irfft(self.Uc_hatT, 1)
+        u[:] = irfft(self.Uc_hatT, axis=1)
         return u
 
