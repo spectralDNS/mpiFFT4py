@@ -17,7 +17,7 @@ L = array([2*pi, 2*pi, 2*pi])
 def FFT(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
     if request.param[:3] == "pen":
-        return pencil_FFT[string.upper(request.param[-2])](array([N, N, N]), L, MPI, prec)
+        return pencil_FFT(array([N, N, N]), L, MPI, prec, None, alignment=string.upper(request.param[-2]))
     else:
         return slab_FFT(array([N, N, N]), L, MPI, prec)
 
@@ -37,7 +37,8 @@ def test_FFT(FFT):
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     a[:] = A[FFT.real_local_slice()]
     c = FFT.fftn(a, c)
-    B2 = rfftn(A, axes=(0,1,2))
+    #B2 = rfftn(A, axes=(0,1,2))
+    #assert allclose(c, B2[FFT.complex_local_slice()])
     a = FFT.ifftn(c, a)
     assert allclose(a, A[FFT.real_local_slice()], 5e-7, 5e-7)
 
@@ -58,7 +59,7 @@ def test_FFT2(FFT2):
     a = FFT2.ifft2(c, a)
     assert allclose(a, A[FFT2.real_local_slice()], 5e-7, 5e-7)
 
-#test_FFT(pencil_FFT["Y"](array([N, N, N], dtype=int), L.astype(float64), MPI, "double", 2))
-#test_FFT(pencil_FFT["Y"](array([N, N, N], dtype=int), L, MPI, "single", 2))
+#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", 2), alignment="X")
 #test_FFT(slab_FFT(array([N, N, N]), L, MPI, "single"))
 #test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
+

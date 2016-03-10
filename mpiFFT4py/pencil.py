@@ -8,7 +8,7 @@ import numpy as np
 
 #__all__ = ['FastFourierTransform']
 
-params = {'Alignment': 'X',
+params = {'alignment': 'X',
           'P1': 2,
           'method': 'Swap'}
 
@@ -94,9 +94,8 @@ class FastFourierTransformY(object):
     
     """
 
-    def __init__(self, N, L, MPI, precision, P1=None, **kwargs):
+    def __init__(self, N, L, MPI, precision, P1=None):
         self.params = params
-        self.params.update(kwargs)
         self.N = N
         assert len(L) == 3
         assert len(N) == 3
@@ -361,7 +360,7 @@ class FastFourierTransformX(FastFourierTransformY):
     precision - "single" or "double"
     
     This version has the final complex data aligned in the x-direction
-    
+    FIXME Need to install swap version
     """
     
     def __init__(self, N, L, MPI, precision, P1=None):
@@ -385,6 +384,10 @@ class FastFourierTransformX(FastFourierTransformY):
         """The local shape of the complex data"""
         return (self.N[0], self.N1[1], self.N2[2]/2)
     
+    def real_shape(self):
+        """The local shape of the real data"""
+        return (self.N1[0], self.N2[1], self.N[2])
+    
     def complex_shape_T(self):
         """The local transposed shape of the complex data"""
         return (self.Np[0], self.N[1], self.Nf)
@@ -392,6 +395,20 @@ class FastFourierTransformX(FastFourierTransformY):
     def complex_shape_I(self):
         """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
+    
+    def real_local_slice(self):
+        xyrank = self.comm0.Get_rank() # Local rank in xz-plane
+        yzrank = self.comm1.Get_rank() # Local rank in xy-plane
+        return (slice(xyrank * self.N1[0], (xyrank+1) * self.N1[0], 1),
+                slice(yzrank * self.N2[1], (yzrank+1) * self.N2[1], 1),
+                slice(0, self.N[2]))
+        
+    def complex_local_slice(self):
+        xyrank = self.comm0.Get_rank() # Local rank in xz-plane
+        yzrank = self.comm1.Get_rank() # Local rank in yz-plane
+        return (slice(0, self.N[0]),
+                slice(xyrank*self.N1[1], (xyrank+1)*self.N1[1], 1),
+                slice(yzrank*self.N2[2]/2, (yzrank+1)*self.N2[2]/2, 1))
 
     #def complex_shape_padded_T(self):
         #"""The local shape of the transposed complex data padded in x and z directions"""
@@ -481,8 +498,10 @@ class FastFourierTransformX(FastFourierTransformY):
         fu[:] = fft(self.Uc_hat_xr, axis=0)
         return fu
 
-FastFourierTransform = {
-    "X": FastFourierTransformX,
-    "Y": FastFourierTransformY
-    }
-        
+def FastFourierTransform(N, L, MPI, precision, P1=None, **kwargs):
+    global params
+    params.update(kwargs)
+    if params['alignment'] == 'X':
+        return FastFourierTransformX(N, L, MPI, precision, P1)
+    else:
+        return FastFourierTransformY(N, L, MPI, precision, P1)
