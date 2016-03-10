@@ -19,7 +19,7 @@ L = array([2*pi, 2*pi, 2*pi], dtype=float)
 # the FFT class using a slab decomposition. With slab decomposition the first index in real
 # physical space is shared amongst the processors, whereas in wavenumber space the second 
 # index is shared.
-FFT = FastFourierTransform(N, L, MPI, "double", None, Alignment='Y')
+FFT = FastFourierTransform(N, L, MPI, "double", None, alignment='Y')
 
 U = random.random(FFT.real_shape()).astype(FFT.float) # real_shape = (N[0]/comm.Get_size(), N[1], N[2])
 U_hat = zeros(FFT.complex_shape(), dtype=FFT.complex) # complex_shape = (N[0], N[1]//comm.Get_size(), N[2]/2+1)
