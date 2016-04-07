@@ -5,7 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
            'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn', 
-           'fftfreq', 'empty', 'zeros']
+           'fftfreq', 'rfftfreq', 'empty', 'zeros']
 
 import pyfftw
 from numpy import iscomplexobj, zeros_like, zeros as npzeros

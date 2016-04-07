@@ -5,10 +5,10 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
            'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn', 
-           'fftfreq', 'empty', 'zeros']
+           'fftfreq', 'rfftfreq', 'empty', 'zeros']
 
 from numpy import empty, zeros, iscomplexobj
-from numpy.fft import fftfreq, fft, ifft, fftn, ifftn, rfft, irfft, rfft2, irfft2, rfftn, irfftn, fft2, ifft2
+from numpy.fft import fftfreq, rfftfreq, fft, ifft, fftn, ifftn, rfft, irfft, rfft2, irfft2, rfftn, irfftn, fft2, ifft2
 from scipy.fftpack import dct
 
 dct1 = dct
