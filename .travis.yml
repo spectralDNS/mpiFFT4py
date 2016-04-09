@@ -22,7 +22,6 @@ install:
     - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION mpi4py scipy pytest
     - source activate test-environment
     - python setup.py install
-    - which python
     
 script: cd $PWD/tests; mpirun -np 8 py.test
 
