@@ -1,6 +1,6 @@
 import pytest
 import string
-from numpy.random import random
+from numpy.random import random, randn
 from numpy import allclose, zeros, zeros_like, pi, array, int, all
 from numpy.fft import fftfreq
 from mpi4py import MPI
@@ -78,18 +78,22 @@ def test_FFT_padded(FFT_padded):
         ks = (fftfreq(N[1])*N[1]).astype(int)
         Cp[:N[0]/2, ks, :Nf] = C[:N[0]/2]
         Cp[-N[0]/2:, ks, :Nf] = C[N[0]/2:]
-        Cp[:, -N[1]/2, 0] *= 2
-        Cp[-N[0]/2, ks, 0] *= 2
-        Cp[-N[0]/2, -N[1]/2, 0] /= 2
+        Cp[:, :, Nf-1] *= 0.5
+        Cp[:, -N/2] *= 0.5
+        Cp[-N/2] *= 0.5
+        Cp[N/2] = Cp[-N/2]
+        Cp[:, N/2] = Cp[:, -N/2]        
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.float)
         Ap[:] = irfftn(Cp*1.5**3, axes=(0,1,2))
         
     else:
         C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.float)
+        A = zeros(N, dtype=FFT.float)
         
     FFT.comm.Bcast(C, root=0)
     FFT.comm.Bcast(Ap, root=0)
+    FFT.comm.Bcast(A, root=0)
     
     ae = zeros(FFT.real_shape_padded(), dtype=FFT.float)
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
@@ -101,14 +105,21 @@ def test_FFT_padded(FFT_padded):
     cp = zeros(FFT.complex_shape(), dtype=FFT.complex)
     ap = FFT.ifftn(c, ap, padded=True)
     
+    #from IPython import embed; embed()
     assert allclose(ap, ae, 5e-7, 5e-7)
     
     cp = FFT.fftn(ap, cp, padded=True)    
     
     assert all((cp-c)/cp < 5e-5)
 
+    aa = zeros(FFT.real_shape(), dtype=FFT.float)
+    aa = FFT.ifftn(cp, aa, padded=False)    
+    
+    a3 = A[FFT.real_local_slice()]
+    assert allclose(aa, a3, 5e-7, 5e-7)
+
 
 #test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", 2), alignment="X")
 #test_FFT(slab_FFT(array([N, N, N]), L, MPI, "single"))
 #test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
-#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double"))
+#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "single"))

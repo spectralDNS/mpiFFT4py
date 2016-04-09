@@ -93,6 +93,10 @@ class FastFourierTransform(object):
     def global_complex_shape(self):
         """Global size of problem in complex wavenumber space"""
         return (self.N[0], self.N[1], self.Nf)
+
+    def global_complex_shape_padded(self):
+        """Global size of problem in complex wavenumber space"""
+        return (3*self.N[0]/2, 3*self.N[1]/2, 3*self.N[2]/4+1)
     
     def real_local_slice(self, padded=False):
         if padded:
@@ -163,13 +167,16 @@ class FastFourierTransform(object):
                 assert u.shape == self.real_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = zeros(self.complex_shape_padded(), dtype=complex)
+                fu_padded = zeros(self.global_complex_shape_padded(), dtype=complex)
                 ks = (fftfreq(self.N[1])*self.N[1]).astype(int)
                 fu_padded[:self.N[0]/2, ks, :self.Nf] = fu[:self.N[0]/2]
                 fu_padded[-self.N[0]/2:, ks, :self.Nf] = fu[self.N[0]/2:]
-                fu_padded[:, -self.N[1]/2, 0] *= 2
-                fu_padded[-self.N[0]/2, ks, 0] *= 2
-                fu_padded[-self.N[0]/2, -self.N[1]/2, 0] /= 2
+                fu_padded[:, :, self.Nf-1] *= 0.5
+                fu_padded[:, -self.N[1]/2] *= 0.5
+                fu_padded[-self.N[0]/2] *= 0.5
+                fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
+                fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[0]/2]
+
                 u[:] = irfftn(fu_padded*1.5**3, axes=(0,1,2))
             return u
         
@@ -214,8 +221,18 @@ class FastFourierTransform(object):
             
             else:
                 assert u.shape == self.real_shape_padded()
+                fu_padded = zeros(self.global_complex_shape_padded(), dtype=complex)
+                fu_padded[:] = rfftn(u/1.5**3, axes=(0,1,2))
                 
-                fu[:] = rfftn(u/1.5**3, axes=(0,1,2))
+                # Copy with truncation
+                ks = (fftfreq(self.N[1])*self.N[1]).astype(int)
+                fu[:self.N[0]/2] = fu_padded[:self.N[0]/2, ks, :self.Nf] 
+                fu[self.N[0]/2:] = fu_padded[-self.N[0]/2:, ks, :self.Nf] 
+                                
+                # Modify for symmetric padding
+                fu[:, :, self.Nf-1] *= 2
+                fu[:, -self.N[1]/2] *= 2
+                fu[self.N[0]/2] *= 2
                 
             return fu
         
@@ -261,7 +278,8 @@ class FastFourierTransform(object):
             
             # Truncate to original complex shape
             fu[:self.N[0]/2] = self.Upad_hat[:self.N[0]/2]
-            fu[self.N[0]/2:] = self.Upad_hat[-self.N[0]/2:]        
+            fu[self.N[0]/2:] = self.Upad_hat[-self.N[0]/2:]
+            fu[self.N[0]/2] *= 2
         
         return fu
     
@@ -298,24 +316,25 @@ class FastFourierTransform(object):
         fp[:self.N[0]/2] = fu[:self.N[0]/2]
         fp[-(self.N[0]/2):] = fu[self.N[0]/2:]
         # Factor 2s because of real transform
-        fp[-self.N[0]/2, :, 0] *= 2        
-        if self.num_processes == 1:
-            fp[-self.N[0]/2, -self.N[1]/2, 0] /= 2
-        elif self.rank == self.num_processes / 2:
-            fp[-self.N[0]/2, 0, 0] /= 2
+        fp[-self.N[0]/2] *= 0.5
+        fp[self.N[0]/2] = fp[-self.N[0]/2]
         return fp
 
     def copy_to_padded_y(self, fu, fp):
         fp[:, :self.N[1]/2] = fu[:, :self.N[1]/2]
         fp[:, -(self.N[1]/2):] = fu[:, self.N[1]/2:]
-        fp[:, -self.N[1]/2, 0] *= 2
+        fp[:, -self.N[1]/2] *= 0.5
+        fp[:, self.N[1]/2] = fp[:, -self.N[1]/2]
         return fp
     
     def copy_to_padded_z(self, fu, fp):
         fp[:, :, :self.Nf] = fu[:]
+        fp[:, :, self.Nf-1] *= 0.5
         return fp
     
     def copy_from_padded(self, fp, fu):
         fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
         fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
+        fu[:, :, self.Nf-1] *= 2
+        fu[:, -self.N[1]/2] *= 2
         return fu
