@@ -6,6 +6,16 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from serialFFT import *
 import numpy as np
 
+class work_arrays(dict):
+    
+    def __missing__(self, key):
+        shape, dtype, i = key
+        a = zeros(shape, dtype=dtype)
+        self[key] = a
+        return self[key]
+
+_work_arrays = work_arrays()
+
 class FastFourierTransform(object):
     """Class for performing FFT in 3D using MPI
     
@@ -361,3 +371,19 @@ class FastFourierTransform(object):
         fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
         fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
         return fu
+    
+    def get_workarray(self, a, i=0):
+        if isinstance(a, ndarray):
+            shape = a.shape
+            dtype = a.dtype
+            
+        elif isinstance(a, tuple):
+            assert len(a) == 2
+            shape, dtype = a
+            
+        else:
+            raise TypeError("Wrong type for get_workarray")
+        
+        a = _work_arrays[(shape, dtype, i)]
+        a[:] = 0
+        return a
