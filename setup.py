@@ -10,11 +10,11 @@ maintenance = 0
 
 setup(name = "mpiFFT4py",
       version = "%d.%d.%d" % (major, minor, maintenance),
-      description = "mpiFFT4py -- Parallel 3D FFT in Python using mpi4py",
+      description = "mpiFFT4py -- Parallel 3D FFT in Python using MPI for Python",
       long_description = "",
       author = "Mikael Mortensen",
       author_email = "mikaem@math.uio.no", 
-      url = 'https://github.com/mikaem/mpiFFT4py',
+      url = 'https://github.com/spectralDNS/mpiFFT4py',
       classifiers = [
           'Development Status :: 5 - Production/Stable',
           'Environment :: Console',

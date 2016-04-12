@@ -15,7 +15,9 @@ class FastFourierTransform(object):
     L - NumPy array([Lx, Ly, Lz]) The actual size of the real mesh
     MPI - The MPI object (from mpi4py import MPI)
     precision - "single" or "double"
-        
+    
+    The transform is real to complex
+    
     """
     def __init__(self, N, L, MPI, precision, communication="alltoall"):
         self.N = N
@@ -24,14 +26,15 @@ class FastFourierTransform(object):
         self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
         self.MPI = MPI
         self.comm = comm = MPI.COMM_WORLD
-        self.float, self.complex, self.mpitype = float, complex, mpitype = self.types(precision)
+        self.float, self.complex, self.mpitype = self.types(precision)
         self.communication = communication
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()        
         self.Np = N / self.num_processes     
-        self.L = L.astype(float)
+        self.L = L.astype(self.float)
         self.Uc_hat = None
         self.Upad_hat = None
+        self.dealias = None
         if not self.num_processes in [2**i for i in range(int(np.log2(N[0]))+1)]:
             raise IOError("Number of cpus must be in ", [2**i for i in range(int(np.log2(N[0]))+1)])
         
@@ -147,42 +150,64 @@ class FastFourierTransform(object):
                            (abs(K[2]) < kmax[2]), dtype=np.uint8)
         return dealias
 
-    def ifftn(self, fu, u, padded=False):
+    def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
         Need to do ifft in reversed order of fft
 
-        Padded transform with 3/2-rule possible choice
-        If padded, then fu is padded with zeros using the 3/2 rule 
-        before transforming to real space of shape real_shape_padded()
+        dealias = "3/2-rule"
+            - Padded transform with 3/2-rule. fu is padded with zeros
+              before transforming to real space of shape real_shape_padded()
+            - u real_shape_padded()
         
+        dealias = "2/3-rule"
+            - Transform is using 2/3-rule, i.e., frequencies higher than
+              2/3*N are set to zero before transforming
+            - u real_shape()
+              
+        dealias = None
+            - Regular transform
+            - u real_shape()
+            
         fu is of shape complex_shape()
-        u is either real_shape() or real_shape_padded()
         
         """
+
         if self.num_processes == 1:
-            if not padded:
+            if not dealias == '3/2-rule':
+                if dealias == '2/3-rule':
+                    if self.dealias is None:
+                        self.dealias = self.get_dealias_filter()
+                    fu *= self.dealias
+                
                 u[:] = irfftn(fu, axes=(0,1,2))
             
             else:
                 assert u.shape == self.real_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = zeros(self.global_complex_shape_padded(), dtype=complex)
+                fu_padded = zeros(self.global_complex_shape_padded(), dtype=self.complex)
                 ks = (fftfreq(self.N[1])*self.N[1]).astype(int)
                 fu_padded[:self.N[0]/2, ks, :self.Nf] = fu[:self.N[0]/2]
                 fu_padded[-self.N[0]/2:, ks, :self.Nf] = fu[self.N[0]/2:]
-                fu_padded[:, :, self.Nf-1] *= 0.5
-                fu_padded[:, -self.N[1]/2] *= 0.5
-                fu_padded[-self.N[0]/2] *= 0.5
-                fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
-                fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[0]/2]
-
+                
+                ## Current transform is only exactly reversible if periodic transforms are made symmetric
+                ## However, this leads to more aliasing and as such the non-symmetrical padding is used
+                #fu_padded[:, -self.N[1]/2] *= 0.5
+                #fu_padded[-self.N[0]/2] *= 0.5
+                #fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
+                #fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[0]/2]
+                
                 u[:] = irfftn(fu_padded*1.5**3, axes=(0,1,2))
             return u
         
-        self.init_work_arrays(padded)
+        self.init_work_arrays(dealias == '3/2-rule')
         
-        if not padded:
+        if not dealias == '3/2-rule':
+            if dealias == '2/3-rule':
+                if self.dealias is None:
+                    self.dealias = self.get_dealias_filter()
+                fu *= self.dealias
+    
             # Do first owned direction
             self.Uc_hat[:] = ifft(fu, axis=0)
                 
@@ -212,33 +237,40 @@ class FastFourierTransform(object):
         return u
 
 
-    def fftn(self, u, fu, padded=False):
+    def fftn(self, u, fu, dealias=None):
         """fft in three directions using mpi
+        
+        u is real an either of shape real_shape() or real_shape_padded()
+        
+        fu is complex and of shape complex_shape()
+        
         """
         if self.num_processes == 1:
-            if not padded:
+            if not dealias == '3/2-rule':
+                assert u.shape == self.real_shape()
+                
                 fu[:] = rfftn(u, axes=(0,1,2))
             
             else:
                 assert u.shape == self.real_shape_padded()
-                fu_padded = zeros(self.global_complex_shape_padded(), dtype=complex)
+                
+                fu_padded = zeros(self.global_complex_shape_padded(), dtype=self.complex)
                 fu_padded[:] = rfftn(u/1.5**3, axes=(0,1,2))
                 
                 # Copy with truncation
                 ks = (fftfreq(self.N[1])*self.N[1]).astype(int)
                 fu[:self.N[0]/2] = fu_padded[:self.N[0]/2, ks, :self.Nf] 
                 fu[self.N[0]/2:] = fu_padded[-self.N[0]/2:, ks, :self.Nf] 
-                                
-                # Modify for symmetric padding
-                fu[:, :, self.Nf-1] *= 2
-                fu[:, -self.N[1]/2] *= 2
-                fu[self.N[0]/2] *= 2
                 
+                ## Modify for symmetric padding
+                #fu[:, -self.N[1]/2] *= 2
+                #fu[self.N[0]/2] *= 2                
+                                
             return fu
         
-        self.init_work_arrays(padded)
+        self.init_work_arrays(dealias == '3/2-rule')
         
-        if not padded:
+        if not dealias == '3/2-rule':
             if self.communication == 'alltoall':
                 # Do 2 ffts in y-z directions on owned data
                 self.Uc_hatT[:] = rfft2(u, axes=(1,2))
@@ -279,7 +311,6 @@ class FastFourierTransform(object):
             # Truncate to original complex shape
             fu[:self.N[0]/2] = self.Upad_hat[:self.N[0]/2]
             fu[self.N[0]/2:] = self.Upad_hat[-self.N[0]/2:]
-            fu[self.N[0]/2] *= 2
         
         return fu
     
@@ -315,26 +346,18 @@ class FastFourierTransform(object):
     def copy_to_padded_x(self, fu, fp):
         fp[:self.N[0]/2] = fu[:self.N[0]/2]
         fp[-(self.N[0]/2):] = fu[self.N[0]/2:]
-        # Factor 2s because of real transform
-        fp[-self.N[0]/2] *= 0.5
-        fp[self.N[0]/2] = fp[-self.N[0]/2]
         return fp
 
     def copy_to_padded_y(self, fu, fp):
         fp[:, :self.N[1]/2] = fu[:, :self.N[1]/2]
         fp[:, -(self.N[1]/2):] = fu[:, self.N[1]/2:]
-        fp[:, -self.N[1]/2] *= 0.5
-        fp[:, self.N[1]/2] = fp[:, -self.N[1]/2]
         return fp
     
     def copy_to_padded_z(self, fu, fp):
         fp[:, :, :self.Nf] = fu[:]
-        fp[:, :, self.Nf-1] *= 0.5
         return fp
     
     def copy_from_padded(self, fp, fu):
         fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
         fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
-        fu[:, :, self.Nf-1] *= 2
-        fu[:, -self.N[1]/2] *= 2
         return fu

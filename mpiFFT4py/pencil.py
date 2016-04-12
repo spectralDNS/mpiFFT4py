@@ -181,17 +181,6 @@ class FastFourierTransformY(object):
                 slice(0, self.N[1]),
                 slice(xzrank*self.N1[2]/2, xzrank*self.N1[2]/2 + self.N1f, 1))
 
-    #def complex_shape_padded_T(self):
-        #"""The local shape of the transposed complex data padded in x and z directions"""
-        #return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/4+1)
-
-    #def real_shape_padded(self):
-        #"""The local shape of the real data"""
-        #return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/2)
-    
-    #def complex_shape_padded(self):
-        #return (3*self.N[0]/2, 3*self.Np[1]/2, 3*self.N[2]/4+1)
-        
     def get_P(self):
         return self.P1, self.P2
     
