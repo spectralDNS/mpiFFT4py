@@ -373,7 +373,7 @@ class FastFourierTransform(object):
         return fu
     
     def get_workarray(self, a, i=0):
-        if isinstance(a, ndarray):
+        if isinstance(a, np.ndarray):
             shape = a.shape
             dtype = a.dtype
             

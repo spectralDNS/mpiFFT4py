@@ -115,7 +115,7 @@ class FastFourierTransformY(object):
         self.num_processes = comm.Get_size()
         assert self.num_processes > 1
         self.L = L.astype(float)
-        
+        self.dealias = None
         self.rank = comm.Get_rank()
         if P1 is None:
             P1 = self.num_processes / 2
@@ -235,10 +235,17 @@ class FastFourierTransformY(object):
                            (abs(K[2]) < kmax[2]), dtype=np.uint8)
         return dealias
         
-    def ifftn(self, fu, u):
+    def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
         Need to do ifft in reversed order of fft
         """
+        assert dealias in ('2/3-rule', 'None', None)
+        
+        if dealias == '2/3-rule':
+            if self.dealias is None:
+                self.dealias = self.get_dealias_filter()
+            fu *= self.dealias
+
         if self.params['method'] == 'Nyquist':
             # Do first owned direction
             self.Uc_hat_y[:] = ifft(fu, axis=1)
@@ -288,9 +295,11 @@ class FastFourierTransformY(object):
 
         return u
 
-    def fftn(self, u, fu):
+    def fftn(self, u, fu, dealias=None):
         """fft in three directions using mpi
         """
+        assert dealias in ('2/3-rule', 'None', None)
+        
         if self.params['method'] == 'Nyquist':
             # Do fft in z direction on owned data
             self.Uc_hat_z[:] = rfft(u, axis=2)
@@ -348,7 +357,7 @@ class FastFourierTransformY(object):
         return fu
     
     def get_workarray(self, a, i=0):
-        if isinstance(a, ndarray):
+        if isinstance(a, np.ndarray):
             shape = a.shape
             dtype = a.dtype
             
