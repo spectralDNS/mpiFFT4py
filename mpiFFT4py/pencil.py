@@ -78,6 +78,15 @@ def transform_Uc_zy(Uc_hat_z, Uc_hat_y, P):
     Uc_hat_z[:, :, :-1] = np.rollaxis(Uc_hat_y.reshape((sy[0], P, sz[1], sy[2])), 1, 3).reshape((sz[0], sz[1], sz[2]-1)) 
     return Uc_hat_z
 
+class work_arrays(dict):
+    
+    def __missing__(self, key):
+        shape, dtype, i = key
+        a = zeros(shape, dtype=dtype)
+        self[key] = a
+        return self[key]
+
+_work_arrays = work_arrays()
 
 class FastFourierTransformY(object):
     """Class for performing FFT in 3D using MPI
@@ -337,6 +346,23 @@ class FastFourierTransformY(object):
             fu[:] = fft(self.Uc_hat_y, axis=1)
 
         return fu
+    
+    def get_workarray(self, a, i=0):
+        if isinstance(a, ndarray):
+            shape = a.shape
+            dtype = a.dtype
+            
+        elif isinstance(a, tuple):
+            assert len(a) == 2
+            shape, dtype = a
+            
+        else:
+            raise TypeError("Wrong type for get_workarray")
+        
+        a = _work_arrays[(shape, dtype, i)]
+        a[:] = 0
+        return a
+
 
 class FastFourierTransformX(FastFourierTransformY):
     """Class for performing FFT in 3D using MPI
