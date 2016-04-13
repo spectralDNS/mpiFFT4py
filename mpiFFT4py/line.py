@@ -40,6 +40,16 @@ def swap_Nq(fft_y, fu, fft_x, N):
     fft_y[N[0]/2+1:] = np.conj(fft_y[(N[0]/2-1):0:-1])
     return fft_y
 
+class work_arrays(dict):
+    
+    def __missing__(self, key):
+        shape, dtype, i = key
+        a = zeros(shape, dtype=dtype)
+        self[key] = a
+        return self[key]
+
+_work_arrays = work_arrays()
+
 class FastFourierTransform(object):
     """Class for performing FFT in 2D using MPI
     
@@ -66,6 +76,7 @@ class FastFourierTransform(object):
         self.Np = N / self.num_processes
         self.Nf = N[1]/2+1
         self.Npf = self.Np[1]/2+1 if self.rank+1 == self.num_processes else self.Np[1]/2
+        self.dealias = None
 
         self.U_recv = empty((self.N[0], self.Np[1]/2), dtype=complex)
         self.fft_y = empty(N[0], dtype=complex)
@@ -127,7 +138,9 @@ class FastFourierTransform(object):
         dealias = np.array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1]), dtype=np.uint8)
         return dealias
 
-    def fft2(self, u, fu):
+    def fft2(self, u, fu, dealias=None):
+        assert dealias in ('2/3-rule', 'None', None)
+        
         if self.num_processes == 1:
             fu[:] = rfft2(u, axes=(0,1))
             return fu    
@@ -153,7 +166,14 @@ class FastFourierTransform(object):
             
         return fu
 
-    def ifft2(self, fu, u):
+    def ifft2(self, fu, u, dealias=None):
+        assert dealias in ('2/3-rule', 'None', None)
+        
+        if dealias == '2/3-rule':
+            if self.dealias is None:
+                self.dealias = self.get_dealias_filter()
+            fu *= self.dealias
+        
         if self.num_processes == 1:
             u[:] = irfft2(fu, axes=(0,1))
             return u
@@ -174,3 +194,18 @@ class FastFourierTransform(object):
         u[:] = irfft(self.Uc_hatT, axis=1)
         return u
 
+    def get_workarray(self, a, i=0):
+        if isinstance(a, np.ndarray):
+            shape = a.shape
+            dtype = a.dtype
+            
+        elif isinstance(a, tuple):
+            assert len(a) == 2
+            shape, dtype = a
+            
+        else:
+            raise TypeError("Wrong type for get_workarray")
+        
+        a = _work_arrays[(shape, dtype, i)]
+        a[:] = 0
+        return a

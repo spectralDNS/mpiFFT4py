@@ -7,7 +7,7 @@ source:
   git_tag: master
 
 build:
-  number: 2
+  number: 3
 
 requirements:
   build:
