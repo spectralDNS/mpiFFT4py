@@ -143,17 +143,20 @@ def test_FFT_c2c(FFT_c2c):
     atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
 
     if FFT.rank == 0:
+        # Create a reference solution using only one CPU 
         A = (random(N)+random(N)*1j).astype(FFT.complex)
         C = zeros((FFT.global_shape()), dtype=FFT.complex)
         C[:] = fftn(A, axes=(0,1,2))
         
+        # Copy to array padded with zeros
         Cp = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.complex)
         ks = (fftfreq(N[2])*N[2]).astype(int)
         Cp[:N[0]/2, :N[1]/2, ks] = C[:N[0]/2, :N[1]/2]
         Cp[:N[0]/2, -N[1]/2:, ks] = C[:N[0]/2, N[1]/2:]
         Cp[-N[0]/2:, :N[1]/2, ks] = C[N[0]/2:, :N[1]/2]
         Cp[-N[0]/2:, -N[1]/2:, ks] = C[N[0]/2:, N[1]/2:]
-
+        
+        # Get transform of padded array
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.complex)
         Ap[:] = ifftn(Cp*1.5**3, axes=(0,1,2))
         
@@ -162,25 +165,25 @@ def test_FFT_c2c(FFT_c2c):
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.complex)
         A = zeros(N, dtype=FFT.complex)
         
+    # For testing broadcast the arrays computed on root to all CPUs
     FFT.comm.Bcast(C, root=0)
     FFT.comm.Bcast(Ap, root=0)
     FFT.comm.Bcast(A, root=0)
     
-    # Get single processor solution
+    # Get the single processor solution on local part of the solution
     ae = zeros(FFT.original_shape_padded(), dtype=FFT.complex)
     ae[:] = Ap[FFT.original_local_slice(padded=True)]    
     c = zeros(FFT.transformed_shape(), dtype=FFT.complex)    
     c[:] = C[FFT.transformed_local_slice()]
-    # Perform transform with MPI
+    
+    # Perform padded transform with MPI and assert ok
     ap = zeros(FFT.original_shape_padded(), dtype=FFT.complex)
     ap = FFT.ifftn(c, ap, dealias="3/2-rule")        
     assert allclose(ap, ae, rtol, atol)
         
-    # Perform transform with MPI
+    # Perform truncated transform with MPI and assert
     cp = zeros(FFT.transformed_shape(), dtype=FFT.complex)
     cp = FFT.fftn(ap, cp, dealias="3/2-rule")    
-    #from IPython import embed; embed()
-    
     assert all(abs(cp-c)/cp.max() < rtol)
 
     # Now without padding
