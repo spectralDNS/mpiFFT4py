@@ -34,7 +34,7 @@ def FFT2(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
     return line_FFT(array([N, N]), L[:-1], MPI, prec)
 
-@pytest.fixture(params=("slabs", "slabd"), scope='module')
+@pytest.fixture(params=("slabd", "slabs"), scope='module')
 def FFT_c2c(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
     return c2c(array([N, N, N]), L, MPI, prec)
@@ -179,7 +179,9 @@ def test_FFT_c2c(FFT_c2c):
     # Perform transform with MPI
     cp = zeros(FFT.transformed_shape(), dtype=FFT.complex)
     cp = FFT.fftn(ap, cp, dealias="3/2-rule")    
-    assert all(abs(cp-c) < rtol)
+    #from IPython import embed; embed()
+    
+    assert all(abs(cp-c)/cp.max() < rtol)
 
     # Now without padding
     # Transform back to original
@@ -198,4 +200,4 @@ def test_FFT_c2c(FFT_c2c):
 #test_FFT(slab_FFT(array([N, N, N]), L, MPI, "single"))
 #test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
 #test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "single"))
-test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "double"))
+#test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "single"))
