@@ -5,6 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from serialFFT import *
 import numpy as np
+from mpibase import work_arrays, datatypes
 
 #__all__ = ['FastFourierTransform']
 
@@ -78,16 +79,6 @@ def transform_Uc_zy(Uc_hat_z, Uc_hat_y, P):
     Uc_hat_z[:, :, :-1] = np.rollaxis(Uc_hat_y.reshape((sy[0], P, sz[1], sy[2])), 1, 3).reshape((sz[0], sz[1], sz[2]-1)) 
     return Uc_hat_z
 
-class work_arrays(dict):
-    
-    def __missing__(self, key):
-        shape, dtype, i = key
-        a = zeros(shape, dtype=dtype)
-        self[key] = a
-        return self[key]
-
-_work_arrays = work_arrays()
-
 class FastFourierTransformY(object):
     """Class for performing FFT in 3D using MPI
     
@@ -111,7 +102,7 @@ class FastFourierTransformY(object):
         self.Nf = Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
         self.MPI = MPI
         self.comm = comm = MPI.COMM_WORLD
-        self.float, self.complex, self.mpitype = float, complex, mpitype = self.types(precision)
+        self.float, self.complex, self.mpitype = float, complex, mpitype = datatypes(precision)
         self.num_processes = comm.Get_size()
         assert self.num_processes > 1
         self.L = L.astype(float)
@@ -152,10 +143,6 @@ class FastFourierTransformY(object):
             self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
             self.Uc_hat_xr2= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
             self.Uc_hat_xr3= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
-
-    def types(self, precision):
-        return {"single": (np.float32, np.complex64, self.MPI.F_FLOAT_COMPLEX),
-                "double": (np.float64, np.complex128, self.MPI.F_DOUBLE_COMPLEX)}[precision]
 
     def real_shape(self):
         """The local shape of the real data"""
@@ -368,7 +355,7 @@ class FastFourierTransformY(object):
         else:
             raise TypeError("Wrong type for get_workarray")
         
-        a = _work_arrays[(shape, dtype, i)]
+        a = work_arrays[(shape, dtype, i)]
         a[:] = 0
         return a
 
@@ -433,17 +420,6 @@ class FastFourierTransformX(FastFourierTransformY):
         return (slice(0, self.N[0]),
                 slice(xyrank*self.N1[1], (xyrank+1)*self.N1[1], 1),
                 slice(yzrank*self.N2[2]/2, (yzrank+1)*self.N2[2]/2, 1))
-
-    #def complex_shape_padded_T(self):
-        #"""The local shape of the transposed complex data padded in x and z directions"""
-        #return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/4+1)
-
-    #def real_shape_padded(self):
-        #"""The local shape of the real data"""
-        #return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/2)
-    
-    #def complex_shape_padded(self):
-        #return (3*self.N[0]/2, 3*self.Np[1]/2, 3*self.N[2]/4+1)
             
     def get_local_mesh(self):
         xyrank = self.comm0.Get_rank() # Local rank in xz-plane
@@ -471,10 +447,12 @@ class FastFourierTransformX(FastFourierTransformY):
         K  = np.array(np.meshgrid(kx, ky[k2], kz[k1], indexing='ij'), dtype=self.float)
         return K
         
-    def ifftn(self, fu, u):
+    def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
         Need to do ifft in reversed order of fft
         """
+        assert dealias in ('2/3-rule', 'None', None)
+                
         # Do first owned direction
         self.Uc_hat_x[:] = ifft(fu, axis=0)
 
@@ -498,9 +476,11 @@ class FastFourierTransformX(FastFourierTransformY):
         u[:] = irfft(self.Uc_hat_z, axis=2)
         return u
 
-    def fftn(self, u, fu):
+    def fftn(self, u, fu, dealias=None):
         """fft in three directions using mpi
         """
+        assert dealias in ('2/3-rule', 'None', None)
+        
         # Do fft in z direction on owned data
         self.Uc_hat_z[:] = rfft(u, axis=2)
         

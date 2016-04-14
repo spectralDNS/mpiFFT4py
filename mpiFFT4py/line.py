@@ -5,6 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from serialFFT import *
 import numpy as np
+from mpibase import work_arrays, datatypes
 
 def transpose_x(U_send, Uc_hatT, num_processes, Np):
     # Align data in x-direction
@@ -40,16 +41,6 @@ def swap_Nq(fft_y, fu, fft_x, N):
     fft_y[N[0]/2+1:] = np.conj(fft_y[(N[0]/2-1):0:-1])
     return fft_y
 
-class work_arrays(dict):
-    
-    def __missing__(self, key):
-        shape, dtype, i = key
-        a = zeros(shape, dtype=dtype)
-        self[key] = a
-        return self[key]
-
-_work_arrays = work_arrays()
-
 class FastFourierTransform(object):
     """Class for performing FFT in 2D using MPI
     
@@ -69,7 +60,7 @@ class FastFourierTransform(object):
         assert len(N) == 2
         self.MPI = MPI
         self.comm = comm = MPI.COMM_WORLD
-        self.float, self.complex, self.mpitype = float, complex, mpitype = self.types(precision)
+        self.float, self.complex, self.mpitype = float, complex, mpitype = datatypes(precision)
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()
         # Each cpu gets ownership of Np indices
@@ -86,10 +77,6 @@ class FastFourierTransform(object):
         self.Uc_hatT = empty((self.Np[0], self.Nf), dtype=complex)
         self.U_send = empty((self.num_processes, self.Np[0], self.Np[1]/2), dtype=complex)
         self.U_sendr = self.U_send.reshape((N[0], self.Np[1]/2))
-
-    def types(self, precision):
-        return {"single": (np.float32, np.complex64, self.MPI.F_FLOAT_COMPLEX),
-                "double": (np.float64, np.complex128, self.MPI.F_DOUBLE_COMPLEX)}[precision]
 
     def real_shape(self):
         """The local shape of the real data"""
@@ -206,6 +193,6 @@ class FastFourierTransform(object):
         else:
             raise TypeError("Wrong type for get_workarray")
         
-        a = _work_arrays[(shape, dtype, i)]
+        a = work_arrays[(shape, dtype, i)]
         a[:] = 0
         return a
