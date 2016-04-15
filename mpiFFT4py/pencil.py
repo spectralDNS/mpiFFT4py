@@ -395,10 +395,6 @@ class FastFourierTransformX(FastFourierTransformY):
         """The local shape of the complex data"""
         return (self.N[0], self.N1[1], self.N2[2]/2)
     
-    def real_shape(self):
-        """The local shape of the real data"""
-        return (self.N1[0], self.N2[1], self.N[2])
-    
     def complex_shape_T(self):
         """The local transposed shape of the complex data"""
         return (self.Np[0], self.N[1], self.Nf)

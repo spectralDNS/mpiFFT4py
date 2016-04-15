@@ -523,7 +523,7 @@ class c2c(FastFourierTransform):
                 fu[:] = fftn(u, axes=(0,1,2))
             
             else:
-                assert u.shape == self.original_shape_padded() # "real" here meaning before transform
+                assert u.shape == self.original_shape_padded()
                 
                 fu_padded = zeros(u.shape, dtype=self.complex)
                 fu_padded[:] = fftn(u/1.5**3, axes=(0,1,2))
