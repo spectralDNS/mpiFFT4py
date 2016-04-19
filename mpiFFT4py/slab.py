@@ -20,23 +20,24 @@ class FastFourierTransform(object):
     The transform is real to complex
     
     """
-    def __init__(self, N, L, MPI, precision, communication="alltoall"):
+    def __init__(self, N, L, MPI, precision, communication="alltoall", padsize=1.5):
         assert len(L) == 3
         assert len(N) == 3
         self.N = N
         self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
-        self.Nfp = 3*N[2]/4+1 # Number of independent complex wavenumbers in z-direction for padded array
+        self.Nfp = int(padsize*N[2]/2+1) # Number of independent complex wavenumbers in z-direction for padded array        
         self.MPI = MPI
         self.comm = comm = MPI.COMM_WORLD
         self.float, self.complex, self.mpitype = datatypes(precision)
         self.communication = communication
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()        
-        self.Np = N / self.num_processes     
+        self.Np = N / self.num_processes
         self.L = L.astype(self.float)
         self.Uc_hat = None
         self.Upad_hat = None
         self.dealias = None
+        self.padsize = padsize
         self.transform = 'r2c/c2r'
         if not self.num_processes in [2**i for i in range(int(np.log2(N[0]))+1)]:
             raise IOError("Number of cpus must be in ", [2**i for i in range(int(np.log2(N[0]))+1)])
@@ -99,13 +100,13 @@ class FastFourierTransform(object):
 
     def global_complex_shape_padded(self):
         """Global size of problem in complex wavenumber space"""
-        return (3*self.N[0]/2, 3*self.N[1]/2, self.Nfp)
+        return (int(self.padsize*self.N[0]), int(self.padsize*self.N[1]), self.Nfp)
     
     def real_local_slice(self, padded=False):
         if padded:
-            return (slice(3*self.rank*self.Np[0]/2, 3*(self.rank+1)*self.Np[0]/2, 1),
-                    slice(0, 3*self.N[1]/2, 1), 
-                    slice(0, 3*self.N[2]/2, 1))
+            return (slice(int(self.padsize*self.rank*self.Np[0]), int(self.padsize*(self.rank+1)*self.Np[0]), 1),
+                    slice(0, int(self.padsize*self.N[1]), 1), 
+                    slice(0, int(self.padsize*self.N[2]), 1))
         else:
             return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
                     slice(0, self.N[1], 1), 
@@ -197,7 +198,7 @@ class FastFourierTransform(object):
                 #fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
                 #fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[0]/2]
                 
-                u[:] = irfftn(fu_padded*1.5**3, axes=(0,1,2))
+                u[:] = irfftn(fu_padded*self.padsize**3, axes=(0,1,2))
             return u
         
         self.init_work_arrays(dealias == '3/2-rule')
@@ -227,13 +228,13 @@ class FastFourierTransform(object):
 
         else:
             self.Upad_hat = self.copy_to_padded_x(fu, self.Upad_hat)
-            self.Upad_hat[:] = ifft(self.Upad_hat*1.5, axis=0)        
+            self.Upad_hat[:] = ifft(self.Upad_hat*self.padsize, axis=0)        
             self.comm.Alltoall([self.Upad_hat, self.mpitype], [self.U_mpi, self.mpitype])
             self.Upad_hat1[:] = np.rollaxis(self.U_mpi, 1).reshape(self.Upad_hat1.shape)
             self.Upad_hat2 = self.copy_to_padded_y(self.Upad_hat1, self.Upad_hat2)
-            self.Upad_hat2[:] = ifft(self.Upad_hat2*1.5, axis=1)
+            self.Upad_hat2[:] = ifft(self.Upad_hat2*self.padsize, axis=1)
             self.Upad_hat3 = self.copy_to_padded_z(self.Upad_hat2, self.Upad_hat3)
-            u[:] = irfft(self.Upad_hat3*1.5, axis=2)
+            u[:] = irfft(self.Upad_hat3*self.padsize, axis=2)
         return u
 
 
@@ -267,7 +268,7 @@ class FastFourierTransform(object):
                 assert u.shape == self.real_shape_padded()
                 
                 fu_padded = zeros(self.global_complex_shape_padded(), dtype=self.complex)
-                fu_padded[:] = rfftn(u/1.5**3, axes=(0,1,2))
+                fu_padded[:] = rfftn(u/self.padsize**3, axes=(0,1,2))
                 
                 # Copy with truncation
                 ks = (fftfreq(self.N[1])*self.N[1]).astype(int)
@@ -308,7 +309,7 @@ class FastFourierTransform(object):
         
         else:
             # Do ffts in y and z directions
-            self.Upad_hat3[:] = rfft2(u/1.5**2, axes=(1,2))        
+            self.Upad_hat3[:] = rfft2(u/self.padsize**2, axes=(1,2))        
             
             # Copy with truncation 
             self.Upad_hat1 = self.copy_from_padded(self.Upad_hat3, self.Upad_hat1)
@@ -318,7 +319,7 @@ class FastFourierTransform(object):
             self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Upad_hat0, self.mpitype])
             
             # Perform fft of data in x-direction
-            self.Upad_hat[:] = fft(self.Upad_hat0/1.5, axis=0)
+            self.Upad_hat[:] = fft(self.Upad_hat0/self.padsize, axis=0)
             
             # Truncate to original complex shape
             fu[:self.N[0]/2] = self.Upad_hat[:self.N[0]/2]
@@ -328,32 +329,32 @@ class FastFourierTransform(object):
     
     def real_shape_padded(self):
         """The local shape of the real data"""
-        return (3*self.Np[0]/2, 3*self.N[1]/2, 3*self.N[2]/2)
+        return (int(self.padsize*self.Np[0]), int(self.padsize*self.N[1]), int(self.padsize*self.N[2]))
     
     def complex_shape_padded_0(self):
         """Padding in x-direction"""
-        return (3*self.N[0]/2, self.Np[1], self.Nf)
+        return (int(self.padsize*self.N[0]), self.Np[1], self.Nf)
 
     def complex_shape_padded_0_I(self):
         """Padding in x-direction"""
-        return (self.num_processes, 3*self.Np[0]/2, self.Np[1], self.Nf)
+        return (self.num_processes, int(self.padsize*self.Np[0]), self.Np[1], self.Nf)
 
     def complex_shape_padded_1(self):
         """Transpose complex_shape_padded_0"""
-        return (3*self.Np[0]/2, self.N[1], self.Nf)
+        return (int(self.padsize*self.Np[0]), self.N[1], self.Nf)
     
     def complex_shape_padded_2(self):
         """Padding in x and y-directions"""
-        return (3*self.Np[0]/2, 3*self.N[1]/2, self.Nf)
+        return (int(self.padsize*self.Np[0]), int(self.padsize*self.N[1]), self.Nf)
     
     def complex_shape_padded_3(self):
         """Padding in all directions. 
         ifft of this shape leads to real_shape_padded"""
-        return (3*self.Np[0]/2, 3*self.N[1]/2, self.Nfp)
+        return (int(self.padsize*self.Np[0]), int(self.padsize*self.N[1]), self.Nfp)
 
     def complex_shape_padded_I(self):
         """A local intermediate shape of the complex data"""
-        return (3*self.Np[0]/2, self.num_processes, self.Np[1], self.Nf)
+        return (int(self.padsize*self.Np[0]), self.num_processes, self.Np[1], self.Nf)
     
     def copy_to_padded_x(self, fu, fp):
         fp[:self.N[0]/2] = fu[:self.N[0]/2]
@@ -393,11 +394,11 @@ class FastFourierTransform(object):
 
 class c2c(FastFourierTransform):
     
-    def __init__(self, N, L, MPI, precision, communication="alltoall"):
-        FastFourierTransform.__init__(self, N, L, MPI, precision, communication="alltoall")
+    def __init__(self, N, L, MPI, precision, communication="alltoall", padsize=1.5):
+        FastFourierTransform.__init__(self, N, L, MPI, precision, 
+                                      communication=communication, padsize=padsize)
         self.Nf = N[2]      # Number of independent complex wavenumbers in z-direction 
-        self.Nfp = 3*N[2]/2 # Number of independent complex wavenumbers in z-direction for padded array
-        self.Np = N / self.num_processes     
+        self.Nfp = int(self.padsize*self.N[2]) # Number of independent complex wavenumbers in z-direction for padded array
         self.transform = 'c2c/c2c'
         
         # Rename since there's no real space 
@@ -456,7 +457,7 @@ class c2c(FastFourierTransform):
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, ks] = fu[self.N[0]/2:, :self.N[1]/2]
                 fu_padded[-self.N[0]/2:, -self.N[1]/2:, ks] = fu[self.N[0]/2:, self.N[1]/2:]
                                 
-                u[:] = ifftn(fu_padded*1.5**3, axes=(0,1,2))
+                u[:] = ifftn(fu_padded*self.padsize**3, axes=(0,1,2))
             return u
         
         self.init_work_arrays(dealias == '3/2-rule')
@@ -486,13 +487,13 @@ class c2c(FastFourierTransform):
 
         else:
             self.Upad_hat = self.copy_to_padded_x(fu, self.Upad_hat)
-            self.Upad_hat[:] = ifft(self.Upad_hat*1.5, axis=0)        
+            self.Upad_hat[:] = ifft(self.Upad_hat*self.padsize, axis=0)  
             self.comm.Alltoall([self.Upad_hat, self.mpitype], [self.U_mpi, self.mpitype])
             self.Upad_hat1[:] = np.rollaxis(self.U_mpi, 1).reshape(self.Upad_hat1.shape)
             self.Upad_hat2 = self.copy_to_padded_y(self.Upad_hat1, self.Upad_hat2)
-            self.Upad_hat2[:] = ifft(self.Upad_hat2*1.5, axis=1)
+            self.Upad_hat2[:] = ifft(self.Upad_hat2*self.padsize, axis=1)
             self.Upad_hat3 = self.copy_to_padded_z(self.Upad_hat2, self.Upad_hat3)
-            u[:] = ifft(self.Upad_hat3*1.5, axis=2)
+            u[:] = ifft(self.Upad_hat3*self.padsize, axis=2)
         return u
 
 
@@ -526,7 +527,7 @@ class c2c(FastFourierTransform):
                 assert u.shape == self.original_shape_padded()
                 
                 fu_padded = zeros(u.shape, dtype=self.complex)
-                fu_padded[:] = fftn(u/1.5**3, axes=(0,1,2))
+                fu_padded[:] = fftn(u/self.padsize**3, axes=(0,1,2))
                 
                 # Copy with truncation
                 ks = (fftfreq(self.N[2])*self.N[2]).astype(int)
@@ -565,7 +566,7 @@ class c2c(FastFourierTransform):
         
         else:
             # Do ffts in y and z directions
-            self.Upad_hat3[:] = fft2(u/1.5**2, axes=(1,2))        
+            self.Upad_hat3[:] = fft2(u/self.padsize**2, axes=(1,2))        
             
             # Copy with truncation 
             self.Upad_hat1 = self.copy_from_padded(self.Upad_hat3, self.Upad_hat1)
@@ -575,7 +576,7 @@ class c2c(FastFourierTransform):
             self.comm.Alltoall([self.U_mpi, self.mpitype], [self.Upad_hat0, self.mpitype])
             
             # Perform fft of data in x-direction
-            self.Upad_hat[:] = fft(self.Upad_hat0/1.5, axis=0)
+            self.Upad_hat[:] = fft(self.Upad_hat0/self.padsize, axis=0)
             
             # Truncate to original complex shape
             fu[:self.N[0]/2] = self.Upad_hat[:self.N[0]/2]
