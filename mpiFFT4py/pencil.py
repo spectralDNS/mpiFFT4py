@@ -135,12 +135,11 @@ class FastFourierTransformY(object):
         self.Uc_hat_z  = empty((self.N1[0], self.N2[1], self.Nf), dtype=self.complex)
         self.Uc_hat_x  = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
         self.Uc_hat_xr = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
-        self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1[2]/2), dtype=self.complex)
+        self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
         if params['method'] == 'Swap':
             self.xy_plane = zeros((self.N[0], self.N2[1]), dtype=self.complex)
             self.xy_plane2= zeros((self.N[0]/2+1, self.N2[1]), dtype=self.complex)
             self.xy_recv  = zeros((self.N1[0], self.N2[1]), dtype=self.complex)
-            self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
             self.Uc_hat_xr2= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
             self.Uc_hat_xr3= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
 
@@ -150,10 +149,7 @@ class FastFourierTransformY(object):
 
     def complex_shape(self):
         """The local shape of the complex data"""
-        if self.params['method'] == 'Nyquist':
-            return (self.N2[0], self.N[1], self.N1[2]/2)
-        elif self.params['method'] == 'Swap':
-            return (self.N2[0], self.N[1], self.N1f)
+        return (self.N2[0], self.N[1], self.N1f)
     
     def complex_shape_T(self):
         """The local transposed shape of the complex data"""

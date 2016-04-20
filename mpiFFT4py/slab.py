@@ -35,7 +35,7 @@ class FastFourierTransform(object):
         self.Np = N / self.num_processes
         self.L = L.astype(self.float)
         self.Uc_hat = None
-        self.Upad_hat = None
+        self.Upad_hat = np.zeros(0)
         self.dealias = None
         self.padsize = padsize
         self.transform = 'r2c/c2r'
@@ -44,15 +44,15 @@ class FastFourierTransform(object):
         
     def init_work_arrays(self, padded=False):
         
-        if padded:
-            if self.Upad_hat is None:
+        if padded:                
+            if self.Upad_hat.shape != self.complex_shape_padded_0():
                 self.Upad_hat = np.zeros(self.complex_shape_padded_0(), dtype=self.complex)
                 self.Upad_hat0 = np.zeros(self.complex_shape_padded_0(), dtype=self.complex)
                 self.U_mpi = np.zeros(self.complex_shape_padded_0_I(), dtype=self.complex)
                 self.Upad_hat1 = np.zeros(self.complex_shape_padded_1(), dtype=self.complex)
                 self.Upad_hat2 = np.zeros(self.complex_shape_padded_2(), dtype=self.complex)
                 self.Upad_hat3 = np.zeros(self.complex_shape_padded_3(), dtype=self.complex)
-                
+            
             else:
                 self.Upad_hat[:] = 0
                 self.Upad_hat0[:] = 0
@@ -172,6 +172,7 @@ class FastFourierTransform(object):
         fu is of complex_shape()
         
         """
+        assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
 
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
@@ -192,7 +193,7 @@ class FastFourierTransform(object):
                 fu_padded[-self.N[0]/2:, ks, :self.Nf] = fu[self.N[0]/2:]
                 
                 ## Current transform is only exactly reversible if periodic transforms are made symmetric
-                ## However, this leads to more aliasing and as such the non-symmetrical padding is used
+                ## However, this seems to lead to more aliasing and as such the non-symmetrical padding is used
                 #fu_padded[:, -self.N[1]/2] *= 0.5
                 #fu_padded[-self.N[0]/2] *= 0.5
                 #fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
@@ -227,6 +228,7 @@ class FastFourierTransform(object):
             u[:] = irfft2(self.Uc_hatT, axes=(1,2))
 
         else:
+            assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"            
             self.Upad_hat = self.copy_to_padded_x(fu, self.Upad_hat)
             self.Upad_hat[:] = ifft(self.Upad_hat*self.padsize, axis=0)        
             self.comm.Alltoall([self.Upad_hat, self.mpitype], [self.U_mpi, self.mpitype])
@@ -258,6 +260,8 @@ class FastFourierTransform(object):
             - u is of real_shape()
             
         """
+        assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
+        
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
                 assert u.shape == self.real_shape()
@@ -308,6 +312,8 @@ class FastFourierTransform(object):
             fu[:] = fft(fu, axis=0)
         
         else:
+            assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"
+            
             # Do ffts in y and z directions
             self.Upad_hat3[:] = rfft2(u/self.padsize**2, axes=(1,2))        
             
