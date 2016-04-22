@@ -94,7 +94,7 @@ class FastFourierTransformY(object):
     
     """
 
-    def __init__(self, N, L, MPI, precision, P1=None):
+    def __init__(self, N, L, MPI, precision, P1=None, padsize=1.5):
         self.params = params
         self.N = N
         assert len(L) == 3
@@ -107,6 +107,7 @@ class FastFourierTransformY(object):
         assert self.num_processes > 1
         self.L = L.astype(float)
         self.dealias = None
+        self.padsize = padsize
         self.rank = comm.Get_rank()
         if P1 is None:
             P1 = self.num_processes / 2
@@ -128,20 +129,43 @@ class FastFourierTransformY(object):
         if ((P1 % 2 != 0) or (P2 % 2 != 0)):
             raise IOError("Number of cpus in each direction must be even power of 2")
         
-        self.init_work_arrays()
-
-    def init_work_arrays(self):
+    def init_work_arrays(self, padded=False):
         # Initialize MPI work arrays globally
-        self.Uc_hat_z  = empty((self.N1[0], self.N2[1], self.Nf), dtype=self.complex)
-        self.Uc_hat_x  = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
-        self.Uc_hat_xr = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
-        self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
-        if params['method'] == 'Swap':
-            self.xy_plane = zeros((self.N[0], self.N2[1]), dtype=self.complex)
-            self.xy_plane2= zeros((self.N[0]/2+1, self.N2[1]), dtype=self.complex)
-            self.xy_recv  = zeros((self.N1[0], self.N2[1]), dtype=self.complex)
-            self.Uc_hat_xr2= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
-            self.Uc_hat_xr3= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
+        if padded:
+            self.Uc_pad_hat_z  = empty((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), self.Nf), dtype=self.complex)
+            self.Uc_pad_hat_z2 = empty((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), self.padsize*self.N[2]/2+1), dtype=self.complex)
+            self.Uc_pad_hat_x  = empty((self.N[0], int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
+            self.Uc_pad_hat_xr = empty((self.N[0], int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
+            self.Uc_pad_hat_y  = zeros((self.N2[0], int(self.padsize*self.N[1]), self.N1f), dtype=self.complex)
+            self.Uc_pad_hat_y2 = zeros((self.N2[0], int(self.padsize*self.N[1]), self.N1f), dtype=self.complex)
+            self.Uc_pad_hat_xy = empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
+            self.Uc_pad_hat_xy2= empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
+            
+            if params['method'] == 'Swap':
+                self.xy_plane = zeros((self.N[0], self.N2[1]), dtype=self.complex)
+                self.xy_plane2= zeros((self.N[0]/2+1, self.N2[1]), dtype=self.complex)
+                self.xy_recv  = zeros((self.N1[0], self.N2[1]), dtype=self.complex)
+                self.Uc_pad_hat_xr2= empty((self.N[0], int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
+                self.Uc_pad_hat_xr3= empty((self.N[0], int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
+                self.Uc_pad_hat_xy3= empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
+                self.Uc_pad_hat_xy4= empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
+                self.xy_pad_plane = zeros((self.N[0], int(self.padsize*self.N2[1])), dtype=self.complex)
+                self.xy_pad_plane2= zeros((self.N[0]/2+1, int(self.padsize*self.N2[1])), dtype=self.complex)
+                self.xy_pad_recv  = zeros((self.N1[0], int(self.padsize*self.N2[1])), dtype=self.complex)
+                self.xy2_pad_plane = zeros((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1])), dtype=self.complex)
+                self.xy2_pad_recv  = zeros((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1])), dtype=self.complex)
+                
+        else:
+            self.Uc_hat_z  = empty((self.N1[0], self.N2[1], self.Nf), dtype=self.complex)
+            self.Uc_hat_x  = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
+            self.Uc_hat_xr = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
+            self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
+            if params['method'] == 'Swap':
+                self.xy_plane = zeros((self.N[0], self.N2[1]), dtype=self.complex)
+                self.xy_plane2= zeros((self.N[0]/2+1, self.N2[1]), dtype=self.complex)
+                self.xy_recv  = zeros((self.N1[0], self.N2[1]), dtype=self.complex)
+                self.Uc_hat_xr2= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
+                self.Uc_hat_xr3= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
 
     def real_shape(self):
         """The local shape of the real data"""
@@ -159,12 +183,20 @@ class FastFourierTransformY(object):
         """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
 
-    def real_local_slice(self):
+    def real_shape_padded(self):
+        return (int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), int(self.padsize*self.N[2]))
+
+    def real_local_slice(self, padded=False):
         xzrank = self.comm0.Get_rank() # Local rank in xz-plane
         xyrank = self.comm1.Get_rank() # Local rank in xy-plane
-        return (slice(xzrank * self.N1[0], (xzrank+1) * self.N1[0], 1),
-                slice(xyrank * self.N2[1], (xyrank+1) * self.N2[1], 1),
-                slice(0, self.N[2]))
+        if padded:
+            return (slice(int(self.padsize * xzrank * self.N1[0]), int(self.padsize * (xzrank+1) * self.N1[0]), 1),
+                    slice(int(self.padsize * xyrank * self.N2[1]), int(self.padsize * (xyrank+1) * self.N2[1]), 1),
+                    slice(0, int(self.padsize*self.N[2])))            
+        else:
+            return (slice(xzrank * self.N1[0], (xzrank+1) * self.N1[0], 1),
+                    slice(xyrank * self.N2[1], (xyrank+1) * self.N2[1], 1),
+                    slice(0, self.N[2]))
     
     def complex_local_slice(self):
         xzrank = self.comm0.Get_rank() # Local rank in xz-plane
@@ -217,127 +249,313 @@ class FastFourierTransformY(object):
         dealias = np.array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                            (abs(K[2]) < kmax[2]), dtype=np.uint8)
         return dealias
-        
+
+    def copy_to_padded_x(self, fu, fp):
+        fp[:self.N[0]/2] = fu[:self.N[0]/2]
+        fp[-(self.N[0]/2):] = fu[self.N[0]/2:]
+        return fp
+
+    def copy_to_padded_y(self, fu, fp):
+        fp[:, :self.N[1]/2] = fu[:, :self.N[1]/2]
+        fp[:, -(self.N[1]/2):] = fu[:, self.N[1]/2:]
+        return fp
+
+    def copy_to_padded_z(self, fu, fp):
+        fp[:, :, :self.Nf] = fu[:]
+        return fp
+    
+    def copy_from_padded_z(self, fp, fu):
+        fu[:] = fp[:, :, :self.Nf]
+        return fu
+    
+    def copy_from_padded_x(self, fp, fu):
+        fu[:self.N[0]/2] = fp[:self.N[0]/2]
+        fu[self.N[0]/2:] = fp[-self.N[0]/2:]
+        return fu
+
+    def copy_from_padded_y(self, fp, fu):
+        fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2]
+        fu[:, self.N[1]/2:] = fp[:, -self.N[1]/2:]
+        return fu
+    
+    def global_complex_shape(self):
+        """Global size of problem in complex wavenumber space"""
+        return (self.N[0], self.N[1], self.Nf)
+
     def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
         Need to do ifft in reversed order of fft
         """
-        assert dealias in ('2/3-rule', 'None', None)
+        assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
         
-        if dealias == '2/3-rule':
-            if self.dealias is None:
-                self.dealias = self.get_dealias_filter()
-            fu *= self.dealias
+        self.init_work_arrays(dealias == '3/2-rule')
+        
+        if not dealias == '3/2-rule':
+            
+            if dealias == '2/3-rule':
+                if self.dealias is None:
+                    self.dealias = self.get_dealias_filter()
+                fu *= self.dealias
 
-        if self.params['method'] == 'Nyquist':
-            # Do first owned direction
-            self.Uc_hat_y[:] = ifft(fu, axis=1)
+            if self.params['method'] == 'Nyquist':
+                # Do first owned direction
+                self.Uc_hat_y[:] = ifft(fu, axis=1)
 
-            # Transform to x all but k=N/2 (the neglected Nyquist mode)
-            self.Uc_hat_x[:] = 0
-            self.Uc_hat_x[:] = transform_Uc_xy(self.Uc_hat_x, self.Uc_hat_y, self.P2)
-                
-            # Communicate in xz-plane and do fft in x-direction
-            self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-            self.Uc_hat_x[:] = ifft(self.Uc_hat_xr, axis=0)
-                
-            # Communicate and transform in xy-plane
-            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-            self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
+                # Transform to x all but k=N/2 (the neglected Nyquist mode)
+                self.Uc_hat_x[:] = 0
+                self.Uc_hat_x[:] = transform_Uc_xy(self.Uc_hat_x, self.Uc_hat_y, self.P2)
                     
-            # Do fft for y-direction
-            self.Uc_hat_z[:, :, -1] = 0
-            u[:] = irfft(self.Uc_hat_z, axis=2)
-        
-        elif self.params['method'] == 'Swap':
-            xzrank = self.comm0.Get_rank()
+                # Communicate in xz-plane and do fft in x-direction
+                self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+                self.Uc_hat_x[:] = ifft(self.Uc_hat_xr, axis=0)
+                    
+                # Communicate and transform in xy-plane
+                self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+                self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
+                        
+                # Do fft for z-direction
+                self.Uc_hat_z[:, :, -1] = 0
+                u[:] = irfft(self.Uc_hat_z, axis=2)
             
-            # Do first owned direction
-            self.Uc_hat_y[:] = ifft(fu, axis=1)
-
-            # Transform to x
-            self.Uc_hat_xr2[:] = 0
-            self.Uc_hat_xr2[:] = transform_Uc_xy(self.Uc_hat_xr2, self.Uc_hat_y, self.P2)
+            elif self.params['method'] == 'Swap':
                 
-            # Communicate in xz-plane and do fft in x-direction
-            self.comm1.Alltoall([self.Uc_hat_xr2, self.mpitype], [self.Uc_hat_xr3, self.mpitype])
-            self.Uc_hat_xr2[:] = ifft(self.Uc_hat_xr3, axis=0)
-            
-            self.Uc_hat_x[:] = self.Uc_hat_xr2[:, :, :self.N1[2]/2]
-            
-            # Communicate and transform in xy-plane all but k=N/2
-            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-            self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
-            
-            self.xy_plane[:] = self.Uc_hat_xr2[:, :, -1]
-            self.comm0.Scatter(self.xy_plane, self.xy_recv, root=self.P1-1)
-            self.Uc_hat_z[:, :, -1] = self.xy_recv
-            
-            # Do fft for y-direction
-            u[:] = irfft(self.Uc_hat_z, axis=2)
+                # Do first owned direction
+                self.Uc_hat_y[:] = ifft(fu, axis=1)
 
-        return u
+                # Transform to x
+                self.Uc_hat_xr2[:] = 0
+                self.Uc_hat_xr2[:] = transform_Uc_xy(self.Uc_hat_xr2, self.Uc_hat_y, self.P2)
+                    
+                # Communicate in xz-plane and do fft in x-direction
+                self.comm1.Alltoall([self.Uc_hat_xr2, self.mpitype], [self.Uc_hat_xr3, self.mpitype])
+                self.Uc_hat_xr2[:] = ifft(self.Uc_hat_xr3, axis=0)
+                
+                self.Uc_hat_x[:] = self.Uc_hat_xr2[:, :, :self.N1[2]/2]
+                
+                # Communicate and transform in xy-plane all but k=N/2
+                self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+                self.Uc_hat_z[:] = transform_Uc_zx(self.Uc_hat_z, self.Uc_hat_xr, self.P1)
+                
+                self.xy_plane[:] = self.Uc_hat_xr2[:, :, -1]
+                self.comm0.Scatter(self.xy_plane, self.xy_recv, root=self.P1-1)
+                self.Uc_hat_z[:, :, -1] = self.xy_recv
+                
+                # Do ifft for z-direction
+                u[:] = irfft(self.Uc_hat_z, axis=2)
 
+            return u
+        
+        else:  # padded
+
+            if self.params['method'] == 'Nyquist':
+                
+                self.Uc_pad_hat_y2[:] = 0
+                self.Uc_pad_hat_y2 = self.copy_to_padded_y(fu, self.Uc_pad_hat_y2)
+                
+                # Do first owned direction
+                self.Uc_pad_hat_y[:] = ifft(self.Uc_pad_hat_y2*self.padsize, axis=1)
+
+                # Transform to x all but k=N/2 (the neglected Nyquist mode)
+                self.Uc_pad_hat_x[:] = 0
+                self.Uc_pad_hat_x[:] = transform_Uc_xy(self.Uc_pad_hat_x, self.Uc_pad_hat_y, self.P2)
+                
+                # Communicate in xz-plane 
+                self.comm1.Alltoall([self.Uc_pad_hat_x, self.mpitype], [self.Uc_pad_hat_xr, self.mpitype])
+                
+                # Pad and do fft in x-direction
+                self.Uc_pad_hat_xy[:] = 0
+                self.Uc_pad_hat_xy = self.copy_to_padded_x(self.Uc_pad_hat_xr, self.Uc_pad_hat_xy)
+                self.Uc_pad_hat_xy2[:] = ifft(self.Uc_pad_hat_xy*self.padsize, axis=0)
+                    
+                # Communicate in xy-plane
+                self.comm0.Alltoall([self.Uc_pad_hat_xy2, self.mpitype], [self.Uc_pad_hat_xy, self.mpitype])
+                
+                # Transform
+                self.Uc_pad_hat_z[:] = transform_Uc_zx(self.Uc_pad_hat_z, self.Uc_pad_hat_xy, self.P1)
+                self.Uc_pad_hat_z[:, :, -1] = 0
+                        
+                # Pad in z-dir
+                self.Uc_pad_hat_z2[:] = 0
+                self.Uc_pad_hat_z2 = self.copy_to_padded_z(self.Uc_pad_hat_z, self.Uc_pad_hat_z2)
+                
+                # Do ifft for z-direction
+                u[:] = irfft(self.Uc_pad_hat_z2*self.padsize, axis=2)
+            
+            elif self.params['method'] == 'Swap':
+                
+                self.Uc_pad_hat_y2[:] = 0
+                self.Uc_pad_hat_y2 = self.copy_to_padded_y(fu, self.Uc_pad_hat_y2)
+
+                # Do first owned direction
+                self.Uc_pad_hat_y[:] = ifft(self.Uc_pad_hat_y2*self.padsize, axis=1)
+
+                # Transform to x
+                self.Uc_pad_hat_xr2[:] = 0
+                self.Uc_pad_hat_xr2[:] = transform_Uc_xy(self.Uc_pad_hat_xr2, self.Uc_pad_hat_y, self.P2)
+                    
+                # Communicate in xz-plane and do fft in x-direction
+                self.comm1.Alltoall([self.Uc_pad_hat_xr2, self.mpitype], [self.Uc_pad_hat_xr3, self.mpitype])
+                
+                # Pad and do fft in x-direction
+                self.Uc_pad_hat_xy3[:] = 0
+                self.Uc_pad_hat_xy3 = self.copy_to_padded_x(self.Uc_pad_hat_xr3, self.Uc_pad_hat_xy3)
+                self.Uc_pad_hat_xy4[:] = ifft(self.Uc_pad_hat_xy3*self.padsize, axis=0)
+                                
+                self.Uc_pad_hat_xy2[:] = self.Uc_pad_hat_xy4[:, :, :self.N1[2]/2]
+                
+                # Communicate and transform in xy-plane all but k=N/2
+                self.comm0.Alltoall([self.Uc_pad_hat_xy2, self.mpitype], [self.Uc_pad_hat_xy, self.mpitype])
+                
+                self.Uc_pad_hat_z[:] = transform_Uc_zx(self.Uc_pad_hat_z, self.Uc_pad_hat_xy, self.P1)
+                
+                self.xy2_pad_plane[:] = self.Uc_pad_hat_xy4[:, :, -1]
+                self.comm0.Scatter(self.xy2_pad_plane, self.xy2_pad_recv, root=self.P1-1)
+                self.Uc_pad_hat_z[:, :, -1] = self.xy2_pad_recv
+                
+                # Pad in z-dir
+                self.Uc_pad_hat_z2[:] = 0 
+                self.Uc_pad_hat_z2 = self.copy_to_padded_z(self.Uc_pad_hat_z, self.Uc_pad_hat_z2)
+                
+                # Do ifft for z-direction
+                u[:] = irfft(self.Uc_pad_hat_z2*self.padsize, axis=2)
+
+            return u
+            
     def fftn(self, u, fu, dealias=None):
         """fft in three directions using mpi
         """
-        assert dealias in ('2/3-rule', 'None', None)
+        assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
         
-        if self.params['method'] == 'Nyquist':
-            # Do fft in z direction on owned data
-            self.Uc_hat_z[:] = rfft(u, axis=2)
-            
-            # Transform to x direction neglecting k=N/2 (Nyquist)
-            self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
-            
-            # Communicate and do fft in x-direction
-            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-            self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)        
-            
-            # Communicate and transform to final y-direction
-            self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])  
-            self.Uc_hat_y[:] = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr, self.P2)
-                                        
-            # Do fft for last direction 
-            fu[:] = fft(self.Uc_hat_y, axis=1)
+        self.init_work_arrays(dealias == '3/2-rule')
         
-        elif self.params['method'] == 'Swap':
-            # Do fft in z direction on owned data
-            self.Uc_hat_z[:] = rfft(u, axis=2)
+        if not dealias == '3/2-rule':
             
-            # Move real part of Nyquist to k=0
-            self.Uc_hat_z[:, :, 0] += 1j*self.Uc_hat_z[:, :, -1]
+            if self.params['method'] == 'Nyquist':
+                # Do fft in z direction on owned data
+                self.Uc_hat_z[:] = rfft(u, axis=2)
+                
+                # Transform to x direction neglecting k=N/2 (Nyquist)
+                self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
+                
+                # Communicate and do fft in x-direction
+                self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+                self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)        
+                
+                # Communicate and transform to final y-direction
+                self.comm1.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])  
+                self.Uc_hat_y[:] = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr, self.P2)
+                                            
+                # Do fft for last direction 
+                fu[:] = fft(self.Uc_hat_y, axis=1)
             
-            # Transform to x direction neglecting k=N/2 (Nyquist)
-            self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
-            
-            # Communicate and do fft in x-direction
-            self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
-            self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)
-            self.Uc_hat_xr2[:, :, :self.N1[2]/2] = self.Uc_hat_x[:]
+            elif self.params['method'] == 'Swap':
+                # Do fft in z direction on owned data
+                self.Uc_hat_z[:] = rfft(u, axis=2)
+                
+                # Move real part of Nyquist to k=0
+                self.Uc_hat_z[:, :, 0] += 1j*self.Uc_hat_z[:, :, -1]
+                
+                # Transform to x direction neglecting k=N/2 (Nyquist)
+                self.Uc_hat_x[:] = transform_Uc_xz(self.Uc_hat_x, self.Uc_hat_z, self.P1)
+                
+                # Communicate and do fft in x-direction
+                self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+                self.Uc_hat_x[:] = fft(self.Uc_hat_xr, axis=0)
+                self.Uc_hat_xr2[:, :, :self.N1[2]/2] = self.Uc_hat_x[:]
 
-            # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
-            if self.comm0_rank == 0:
-                N = self.N[0]
-                self.xy_plane[:] = self.Uc_hat_x[:, :, 0]
-                self.xy_plane2[:] = np.vstack((self.xy_plane[0].real, 0.5*(self.xy_plane[1:N/2]+np.conj(self.xy_plane[:N/2:-1])), self.xy_plane[N/2].real))
-                self.Uc_hat_xr2[:, :, 0] = np.vstack((self.xy_plane2, np.conj(self.xy_plane2[(N/2-1):0:-1])))
-                self.xy_plane2[:] = np.vstack((self.xy_plane[0].imag, -0.5*1j*(self.xy_plane[1:N/2]-np.conj(self.xy_plane[:N/2:-1])), self.xy_plane[N/2].imag))
-                self.xy_plane[:] = np.vstack((self.xy_plane2, np.conj(self.xy_plane2[(N/2-1):0:-1])))
-                self.comm0.Send([self.xy_plane, self.mpitype], dest=self.P1-1, tag=77)
-            
-            if self.comm0_rank == self.P1-1:
-                self.comm0.Recv([self.xy_plane, self.mpitype], source=0, tag=77)
-                self.Uc_hat_xr2[:, :, -1] = self.xy_plane
-            
-            # Communicate and transform to final y-direction
-            self.comm1.Alltoall([self.Uc_hat_xr2, self.mpitype], [self.Uc_hat_xr3, self.mpitype])  
-            self.Uc_hat_y = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr3, self.P2)
-            
-            # Do fft for last direction 
-            fu[:] = fft(self.Uc_hat_y, axis=1)
+                # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
+                if self.comm0_rank == 0:
+                    N = self.N[0]
+                    self.xy_plane[:] = self.Uc_hat_x[:, :, 0]
+                    self.xy_plane2[:] = np.vstack((self.xy_plane[0].real, 0.5*(self.xy_plane[1:N/2]+np.conj(self.xy_plane[:N/2:-1])), self.xy_plane[N/2].real))
+                    self.Uc_hat_xr2[:, :, 0] = np.vstack((self.xy_plane2, np.conj(self.xy_plane2[(N/2-1):0:-1])))
+                    self.xy_plane2[:] = np.vstack((self.xy_plane[0].imag, -0.5*1j*(self.xy_plane[1:N/2]-np.conj(self.xy_plane[:N/2:-1])), self.xy_plane[N/2].imag))
+                    self.xy_plane[:] = np.vstack((self.xy_plane2, np.conj(self.xy_plane2[(N/2-1):0:-1])))
+                    self.comm0.Send([self.xy_plane, self.mpitype], dest=self.P1-1, tag=77)
+                
+                if self.comm0_rank == self.P1-1:
+                    self.comm0.Recv([self.xy_plane, self.mpitype], source=0, tag=77)
+                    self.Uc_hat_xr2[:, :, -1] = self.xy_plane
+                
+                # Communicate and transform to final y-direction
+                self.comm1.Alltoall([self.Uc_hat_xr2, self.mpitype], [self.Uc_hat_xr3, self.mpitype])  
+                self.Uc_hat_y = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr3, self.P2)
+                
+                # Do fft for last direction 
+                fu[:] = fft(self.Uc_hat_y, axis=1)
 
-        return fu
+            return fu
+        
+        else: # padded
+            
+            assert u.shape == self.real_shape_padded()
+            
+            if self.params['method'] == 'Nyquist':
+                # Do fft in z direction on owned data
+                self.Uc_pad_hat_z2[:] = rfft(u/self.padsize, axis=2)
+                
+                self.Uc_pad_hat_z = self.copy_from_padded_z(self.Uc_pad_hat_z2, self.Uc_pad_hat_z)
+                
+                # Transform to x direction neglecting k=N/2 (Nyquist)
+                self.Uc_pad_hat_xy[:] = transform_Uc_xz(self.Uc_pad_hat_xy, self.Uc_pad_hat_z, self.P1)
+                
+                # Communicate and do fft in x-direction
+                self.comm0.Alltoall([self.Uc_pad_hat_xy, self.mpitype], [self.Uc_pad_hat_xy2, self.mpitype])
+                self.Uc_pad_hat_xy[:] = fft(self.Uc_pad_hat_xy2/self.padsize, axis=0)
+                
+                self.Uc_pad_hat_x = self.copy_from_padded_x(self.Uc_pad_hat_xy, self.Uc_pad_hat_x)
+                
+                # Communicate and transform to final y-direction
+                self.comm1.Alltoall([self.Uc_pad_hat_x, self.mpitype], [self.Uc_pad_hat_xr, self.mpitype])  
+                self.Uc_pad_hat_y = transform_Uc_yx(self.Uc_pad_hat_y, self.Uc_pad_hat_xr, self.P2)
+                                            
+                # Do fft for last direction
+                self.Uc_pad_hat_y2[:] = fft(self.Uc_pad_hat_y/self.padsize, axis=1)
+                fu = self.copy_from_padded_y(self.Uc_pad_hat_y2, fu)
+            
+            elif self.params['method'] == 'Swap':
+                # Do fft in z direction on owned data
+                self.Uc_pad_hat_z2[:] = rfft(u/self.padsize, axis=2)
+                
+                self.Uc_pad_hat_z = self.copy_from_padded_z(self.Uc_pad_hat_z2, self.Uc_pad_hat_z)
+                
+                # Move real part of Nyquist to k=0
+                self.Uc_pad_hat_z[:, :, 0] += 1j*self.Uc_pad_hat_z[:, :, -1]
+                
+                # Transform to x direction neglecting k=N/2 (Nyquist)
+                self.Uc_pad_hat_xy[:] = transform_Uc_xz(self.Uc_pad_hat_xy, self.Uc_pad_hat_z, self.P1)
+                
+                # Communicate and do fft in x-direction
+                self.comm0.Alltoall([self.Uc_pad_hat_xy, self.mpitype], [self.Uc_pad_hat_xy2, self.mpitype])
+                self.Uc_pad_hat_xy[:] = fft(self.Uc_pad_hat_xy2/self.padsize, axis=0)
+                
+                self.Uc_pad_hat_x = self.copy_from_padded_x(self.Uc_pad_hat_xy, self.Uc_pad_hat_x)
+                
+                self.Uc_pad_hat_xr2[:, :, :self.N1[2]/2] = self.Uc_pad_hat_x[:]
+
+                # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
+                if self.comm0_rank == 0:
+                    N = self.N[0]
+                    self.xy_pad_plane[:] = self.Uc_pad_hat_x[:, :, 0]
+                    self.xy_pad_plane2[:] = np.vstack((self.xy_pad_plane[0].real, 0.5*(self.xy_pad_plane[1:N/2]+np.conj(self.xy_pad_plane[:N/2:-1])), self.xy_pad_plane[N/2].real))
+                    self.Uc_pad_hat_xr2[:, :, 0] = np.vstack((self.xy_pad_plane2, np.conj(self.xy_pad_plane2[(N/2-1):0:-1])))
+                    self.xy_pad_plane2[:] = np.vstack((self.xy_pad_plane[0].imag, -0.5*1j*(self.xy_pad_plane[1:N/2]-np.conj(self.xy_pad_plane[:N/2:-1])), self.xy_pad_plane[N/2].imag))
+                    self.xy_pad_plane[:] = np.vstack((self.xy_pad_plane2, np.conj(self.xy_pad_plane2[(N/2-1):0:-1])))
+                    self.comm0.Send([self.xy_pad_plane, self.mpitype], dest=self.P1-1, tag=77)
+                
+                if self.comm0_rank == self.P1-1:
+                    self.comm0.Recv([self.xy_pad_plane, self.mpitype], source=0, tag=77)
+                    self.Uc_pad_hat_xr2[:, :, -1] = self.xy_pad_plane
+                
+                # Communicate and transform to final y-direction
+                self.comm1.Alltoall([self.Uc_pad_hat_xr2, self.mpitype], [self.Uc_pad_hat_xr3, self.mpitype])
+                self.Uc_pad_hat_y = transform_Uc_yx(self.Uc_pad_hat_y, self.Uc_pad_hat_xr3, self.P2)
+                
+                # Do fft for last direction 
+                self.Uc_pad_hat_y2[:] = fft(self.Uc_pad_hat_y/self.padsize, axis=1)
+                fu = self.copy_from_padded_y(self.Uc_pad_hat_y2, fu)
+
+            return fu
     
     def get_workarray(self, a, i=0):
         if isinstance(a, np.ndarray):
