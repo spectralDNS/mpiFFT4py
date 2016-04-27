@@ -8,8 +8,7 @@ from mpi4py import MPI
 import collections
 
 class work_array_dict(dict):
-    """Dictionary of work arrays indexed by their shape, type and an indicator i.
-    """
+    """Dictionary of work arrays indexed by their shape, type and an indicator i."""
     def __missing__(self, key):
         shape, dtype, i = key
         a = np.zeros(shape, dtype=dtype)
@@ -20,10 +19,19 @@ class work_arrays(collections.MutableMapping):
     """A dictionary to hold numpy work arrays.
     
     The dictionary allows two types of keys for the same item.    
-    The key may be a numpy array and an index, like (ndarray, index), 
-    where the shape and type is implied, or
-    the key may be a tuple of (shape, dtype, index)
-    shape is a tuple
+    
+    keys:
+        - (shape, dtype, index), where shape is tuple, dtype is np.dtype and 
+                                 index an integer
+        - (ndarray, index),      where ndarray is a numpy array and index is
+                                 an integer
+                                 
+    Usage:
+        To create two real work arrays of shape (3,3), do:
+        - work = workarrays()
+        - a = work[((3,3), np.float, 0)]
+        - b = work[(a, 1)]
+
     """
 
     def __init__(self):
@@ -67,8 +75,7 @@ class work_arrays(collections.MutableMapping):
 
 
 def datatypes(precision):
-    """Return datatypes associated with precision.
-    """
+    """Return datatypes associated with precision."""
     assert precision in ("single", "double")
     return {"single": (np.float32, np.complex64, MPI.F_FLOAT_COMPLEX),
             "double": (np.float64, np.complex128, MPI.F_DOUBLE_COMPLEX)}[precision]
