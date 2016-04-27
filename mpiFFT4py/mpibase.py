@@ -31,7 +31,9 @@ class work_arrays(collections.MutableMapping):
         self.update(dict(*args, **kwargs))  # use the free update to set keys
 
     def __getitem__(self, key):
-        return self.store[self.__keytransform__(key)]
+        val = self.store[self.__keytransform__(key)]
+        val[:] = 0
+        return val
 
     def __setitem__(self, key, value):
         self.store[self.__keytransform__(key)] = value
@@ -40,7 +42,7 @@ class work_arrays(collections.MutableMapping):
         del self.store[self.__keytransform__(key)]
 
     def __iter__(self):
-        raise TypeError('Work arrays not iterable')
+        return iter(self.store)
 
     def __len__(self):
         return len(self.store)
