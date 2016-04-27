@@ -26,9 +26,8 @@ class work_arrays(collections.MutableMapping):
     shape is a tuple
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         self.store = work_array_dict()
-        self.update(dict(*args, **kwargs))  # use the free update to set keys
 
     def __getitem__(self, key):
         val = self.store[self.__keytransform__(key)]
