@@ -44,38 +44,6 @@ class FastFourierTransform(object):
         if not self.num_processes in [2**i for i in range(int(np.log2(N[0]))+1)]:
             raise IOError("Number of cpus must be in ", [2**i for i in range(int(np.log2(N[0]))+1)])
         
-    def init_work_arrays(self, padded=False):
-        
-        if padded:                
-            if self.Upad_hat.shape != self.complex_shape_padded_0():
-                self.Upad_hat = np.zeros(self.complex_shape_padded_0(), dtype=self.complex)
-                self.Upad_hat0 = np.zeros(self.complex_shape_padded_0(), dtype=self.complex)
-                self.U_mpi = np.zeros(self.complex_shape_padded_0_I(), dtype=self.complex)
-                self.Upad_hat1 = np.zeros(self.complex_shape_padded_1(), dtype=self.complex)
-                self.Upad_hat2 = np.zeros(self.complex_shape_padded_2(), dtype=self.complex)
-                self.Upad_hat3 = np.zeros(self.complex_shape_padded_3(), dtype=self.complex)
-            
-            else:
-                self.Upad_hat[:] = 0
-                self.Upad_hat0[:] = 0
-                self.U_mpi[:] = 0
-                self.Upad_hat1[:] = 0
-                self.Upad_hat2[:] = 0
-                self.Upad_hat3[:] = 0
-            
-        else:
-            # Initialize regular MPI work arrays
-            if self.Uc_hat is None:
-                self.Uc_hat  = np.empty(self.complex_shape(), dtype=self.complex)
-                self.Uc_hatT = np.empty(self.complex_shape_T(), dtype=self.complex)
-                self.Uc_send = self.Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
-                self.Uc_mpi   = np.empty((self.num_processes, self.Np[0], self.Np[1], self.Nf), dtype=self.complex)
-            else:
-                self.Uc_hat[:]  = 0
-                self.Uc_hatT[:] = 0
-                self.Uc_send[:] = 0
-                self.Uc_mpi[:]   = 0
-        
     def real_shape(self):
         """The local shape of the real data"""
         return (self.Np[0], self.N[1], self.N[2])
@@ -204,12 +172,11 @@ class FastFourierTransform(object):
                 u[:] = irfftn(fu_padded*self.padsize**3, axes=(0,1,2))
             return u
         
-        self.init_work_arrays(dealias == '3/2-rule')
-        
         if not dealias == '3/2-rule':
             if dealias == '2/3-rule':
                 fu *= self.dealias
             
+            # Intermediate work arrays required for transform
             Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
             Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
             Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
@@ -235,6 +202,7 @@ class FastFourierTransform(object):
         else:
             assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"            
             
+            # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
             U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0)]
             Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
@@ -304,10 +272,9 @@ class FastFourierTransform(object):
                                 
             return fu
         
-        #self.init_work_arrays(dealias == '3/2-rule')
-        
         if not dealias == '3/2-rule':
-            if self.communication == 'alltoall':                
+            if self.communication == 'alltoall':     
+                # Intermediate work arrays required for transform
                 Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
                 
@@ -337,6 +304,7 @@ class FastFourierTransform(object):
             assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"
             assert u.shape == self.real_shape_padded()
             
+            # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
             Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1)]
             Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
@@ -481,12 +449,11 @@ class c2c(FastFourierTransform):
                 
             return u
         
-        #self.init_work_arrays(dealias == '3/2-rule')
-        
         if not dealias == '3/2-rule':
             if dealias == '2/3-rule':
                 fu *= self.dealias
-    
+            
+            # Intermediate work arrays required for transform
             Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
             Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
             Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
@@ -510,6 +477,7 @@ class c2c(FastFourierTransform):
             u[:] = ifft2(Uc_hatT, axes=(1,2))
 
         else:
+            # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
             U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0)]
             Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
@@ -576,10 +544,9 @@ class c2c(FastFourierTransform):
                                                 
             return fu
         
-        #self.init_work_arrays(dealias == '3/2-rule')
-        
         if not dealias == '3/2-rule':
             if self.communication == 'alltoall':
+                # Intermediate work arrays required for transform
                 Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
 
@@ -606,6 +573,7 @@ class c2c(FastFourierTransform):
             fu[:] = fft(fu, axis=0)
         
         else:
+            # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
             Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1)]
             Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]

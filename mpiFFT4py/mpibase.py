@@ -40,13 +40,13 @@ class work_arrays(collections.MutableMapping):
         del self.store[self.__keytransform__(key)]
 
     def __iter__(self):
-        return iter(self.store)
+        raise TypeError('Work arrays not iterable')
 
     def __len__(self):
         return len(self.store)
     
     def values(self):
-        return [self[self.__keytransform__(key)] for key in self]
+        raise TypeError('Work arrays not iterable')
 
     def __keytransform__(self, key):
         if isinstance(key[0], np.ndarray):

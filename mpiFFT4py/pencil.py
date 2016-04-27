@@ -134,44 +134,6 @@ class FastFourierTransformY(object):
         if ((P1 % 2 != 0) or (P2 % 2 != 0)):
             raise IOError("Number of cpus in each direction must be even power of 2")
         
-    def init_work_arrays(self, padded=False):
-        # Initialize MPI work arrays globally
-        if padded:
-            self.Uc_pad_hat_z  = empty((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), self.Nf), dtype=self.complex)
-            self.Uc_pad_hat_z2 = empty((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), self.padsize*self.N[2]/2+1), dtype=self.complex)
-            self.Uc_pad_hat_x  = empty((self.N[0], int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
-            self.Uc_pad_hat_xr = empty((self.N[0], int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
-            self.Uc_pad_hat_y  = zeros((self.N2[0], int(self.padsize*self.N[1]), self.N1f), dtype=self.complex)
-            self.Uc_pad_hat_y2 = zeros((self.N2[0], int(self.padsize*self.N[1]), self.N1f), dtype=self.complex)
-            self.Uc_pad_hat_xy = empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
-            self.Uc_pad_hat_xy2= empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1[2]/2), dtype=self.complex)
-            
-            if params['method'] == 'Swap':
-                self.xy_plane = zeros((self.N[0], self.N2[1]), dtype=self.complex)
-                self.xy_plane2= zeros((self.N[0]/2+1, self.N2[1]), dtype=self.complex)
-                self.xy_recv  = zeros((self.N1[0], self.N2[1]), dtype=self.complex)
-                self.Uc_pad_hat_xr2= empty((self.N[0], int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
-                self.Uc_pad_hat_xr3= empty((self.N[0], int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
-                self.Uc_pad_hat_xy3= empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
-                self.Uc_pad_hat_xy4= empty((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1]), self.N1f), dtype=self.complex)
-                self.xy_pad_plane = zeros((self.N[0], int(self.padsize*self.N2[1])), dtype=self.complex)
-                self.xy_pad_plane2= zeros((self.N[0]/2+1, int(self.padsize*self.N2[1])), dtype=self.complex)
-                self.xy_pad_recv  = zeros((self.N1[0], int(self.padsize*self.N2[1])), dtype=self.complex)
-                self.xy2_pad_plane = zeros((int(self.padsize*self.N[0]), int(self.padsize*self.N2[1])), dtype=self.complex)
-                self.xy2_pad_recv  = zeros((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1])), dtype=self.complex)
-                
-        else:
-            self.Uc_hat_z  = empty((self.N1[0], self.N2[1], self.Nf), dtype=self.complex)
-            self.Uc_hat_x  = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
-            self.Uc_hat_xr = empty((self.N[0], self.N2[1], self.N1[2]/2), dtype=self.complex)
-            self.Uc_hat_y  = zeros((self.N2[0], self.N[1], self.N1f), dtype=self.complex)
-            if params['method'] == 'Swap':
-                self.xy_plane = zeros((self.N[0], self.N2[1]), dtype=self.complex)
-                self.xy_plane2= zeros((self.N[0]/2+1, self.N2[1]), dtype=self.complex)
-                self.xy_recv  = zeros((self.N1[0], self.N2[1]), dtype=self.complex)
-                self.Uc_hat_xr2= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
-                self.Uc_hat_xr3= empty((self.N[0], self.N2[1], self.N1f), dtype=self.complex)
-
     def real_shape(self):
         """The local shape of the real data"""
         return (self.N1[0], self.N2[1], self.N[2])
@@ -293,7 +255,6 @@ class FastFourierTransformY(object):
         """
         assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
         
-        #self.init_work_arrays(dealias == '3/2-rule')
         if dealias == '2/3-rule' and self.dealias.shape == (0,):
             self.dealias = self.get_dealias_filter()
 
@@ -455,8 +416,6 @@ class FastFourierTransformY(object):
         
         assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
         
-        #self.init_work_arrays(dealias == '3/2-rule')
-
         # Strip off self
         N, N1, N2, Nf, N1f = self.N, self.N1, self.N2, self.Nf, self.N1f        
         
@@ -708,28 +667,41 @@ class FastFourierTransformX(FastFourierTransformY):
         Need to do ifft in reversed order of fft
         """
         assert dealias in ('2/3-rule', 'None', None)
+        
+        if dealias == '2/3-rule' and self.dealias.shape == (0,):
+            self.dealias = self.get_dealias_filter()
+
+        if dealias == '2/3-rule':
+            fu *= self.dealias
+        
+        # Intermediate work arrays required for transform
+        Uc_hat_z  = self.work_arrays[((self.N1[0], self.N2[1], self.Nf), self.complex, 0)]
+        Uc_hat_y  = self.work_arrays[((self.N1[0], self.N[1], self.N2[2]/2), self.complex, 0)]
+        Uc_hat_x  = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]/2), self.complex, 0)]
+        Uc_hat_xr = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]/2), self.complex, 1)]
+        Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
+        Uc_hat_yr_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 1)]
                 
         # Do first owned direction
-        self.Uc_hat_x[:] = ifft(fu, axis=0)
+        Uc_hat_x[:] = ifft(fu, axis=0)
 
         # Communicate in xz-plane and do fft in y-direction
-        self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])
+        self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_xr, self.mpitype])
         
         # Transform to y all but k=N/2 (the neglected Nyquist mode)
-        self.Uc_hat_y[:] = 0
-        self.Uc_hat_y[:] = transform_Uc_yx(self.Uc_hat_y, self.Uc_hat_xr, self.P1)            
-        self.Uc_hat_y[:] = ifft(self.Uc_hat_y, axis=1)
+        Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr, self.P1)            
+        Uc_hat_y[:] = ifft(Uc_hat_y, axis=1)
             
         # Communicate and transform in yz-plane
-        self.Uc_hat_y_T[:] = self.Uc_hat_y.transpose((1, 0, 2))
-        self.comm1.Alltoall([self.Uc_hat_y_T, self.mpitype], 
-                             [self.Uc_hat_yr_T, self.mpitype])
-        self.Uc_hat_y[:] = self.Uc_hat_yr_T.transpose((1, 0, 2))
-        self.Uc_hat_z[:] = transform_Uc_zy(self.Uc_hat_z, self.Uc_hat_y, self.P2)
+        Uc_hat_y_T[:] = Uc_hat_y.transpose((1, 0, 2))
+        self.comm1.Alltoall([Uc_hat_y_T, self.mpitype], 
+                            [Uc_hat_yr_T, self.mpitype])
+        Uc_hat_y[:] = Uc_hat_yr_T.transpose((1, 0, 2))
+        Uc_hat_z[:] = transform_Uc_zy(Uc_hat_z, Uc_hat_y, self.P2)
                 
         # Do ifft for y-direction
-        self.Uc_hat_z[:, :, -1] = 0
-        u[:] = irfft(self.Uc_hat_z, axis=2)
+        Uc_hat_z[:, :, -1] = 0
+        u[:] = irfft(Uc_hat_z, axis=2)
         return u
 
     def fftn(self, u, fu, dealias=None):
@@ -737,25 +709,34 @@ class FastFourierTransformX(FastFourierTransformY):
         """
         assert dealias in ('2/3-rule', 'None', None)
         
+        # Intermediate work arrays required for transform
+        Uc_hat_z  = self.work_arrays[((self.N1[0], self.N2[1], self.Nf), self.complex, 0)]
+        Uc_hat_y  = self.work_arrays[((self.N1[0], self.N[1], self.N2[2]/2), self.complex, 0)]
+        Uc_hat_yr = self.work_arrays[((self.N1[0], self.N[1], self.N2[2]/2), self.complex, 1)]
+        Uc_hat_x  = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]/2), self.complex, 0)]
+        Uc_hat_xr = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]/2), self.complex, 1)]
+        Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
+        Uc_hat_yr_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 1)]
+        
         # Do fft in z direction on owned data
-        self.Uc_hat_z[:] = rfft(u, axis=2)
+        Uc_hat_z[:] = rfft(u, axis=2)
         
         # Transform to y direction neglecting k=N/2 (Nyquist)
-        self.Uc_hat_y[:] = transform_Uc_yz(self.Uc_hat_y, self.Uc_hat_z, self.P2)
+        Uc_hat_y = transform_Uc_yz(Uc_hat_y, Uc_hat_z, self.P2)
         
         # Communicate and do fft in x-direction
-        self.Uc_hat_y_T[:] = self.Uc_hat_y.transpose((1, 0, 2))
-        self.comm1.Alltoall([self.Uc_hat_y_T, self.mpitype], 
-                             [self.Uc_hat_yr_T, self.mpitype])
-        self.Uc_hat_y[:] = self.Uc_hat_yr_T.transpose((1, 0, 2))
-        self.Uc_hat_yr[:] = fft(self.Uc_hat_y, axis=1)
+        Uc_hat_y_T[:] = Uc_hat_y.transpose((1, 0, 2))
+        self.comm1.Alltoall([Uc_hat_y_T, self.mpitype], 
+                            [Uc_hat_yr_T, self.mpitype])
+        Uc_hat_y[:] = Uc_hat_yr_T.transpose((1, 0, 2))
+        Uc_hat_yr[:] = fft(Uc_hat_y, axis=1)
         
         # Communicate and transform to final z-direction
-        self.Uc_hat_x[:] = transform_Uc_xy(self.Uc_hat_x, self.Uc_hat_yr, self.P1)
-        self.comm0.Alltoall([self.Uc_hat_x, self.mpitype], [self.Uc_hat_xr, self.mpitype])  
+        Uc_hat_x = transform_Uc_xy(Uc_hat_x, Uc_hat_yr, self.P1)
+        self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_xr, self.mpitype])  
                                     
         # Do fft for last direction 
-        fu[:] = fft(self.Uc_hat_xr, axis=0)
+        fu[:] = fft(Uc_hat_xr, axis=0)
         return fu
 
 def FastFourierTransform(N, L, MPI, precision, P1=None, **kwargs):
