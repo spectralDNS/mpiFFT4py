@@ -215,8 +215,8 @@ def test_FFT_c2c(FFT_c2c):
 
 
 #test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="Y", method='Nyquist'))
-#test_FFT(slab_FFT(array([N, N, N]), L, MPI, "single"))
-#test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
+#test_FFT(slab_FFT(array([N, N, N]), L, MPI, "double"))
+#test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "double"))
 #test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double"))
-test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="Y", method='Swap'))
+#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="Y", method='Nyquist'))
 #test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "single"))

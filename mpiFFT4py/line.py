@@ -67,16 +67,11 @@ class FastFourierTransform(object):
         self.Np = N / self.num_processes
         self.Nf = N[1]/2+1
         self.Npf = self.Np[1]/2+1 if self.rank+1 == self.num_processes else self.Np[1]/2
-        self.dealias = None
-
-        self.U_recv = empty((self.N[0], self.Np[1]/2), dtype=complex)
+        self.dealias = zeros(0)
+        self.work_arrays = work_arrays()
         self.fft_y = empty(N[0], dtype=complex)
         self.fft_x = empty(N[0], dtype=complex)
         self.plane_recv = empty(self.Np[0], dtype=complex)
-        self.Uc_hat = empty((N[0], self.Npf), dtype=complex)
-        self.Uc_hatT = empty((self.Np[0], self.Nf), dtype=complex)
-        self.U_send = empty((self.num_processes, self.Np[0], self.Np[1]/2), dtype=complex)
-        self.U_sendr = self.U_send.reshape((N[0], self.Np[1]/2))
 
     def real_shape(self):
         """The local shape of the real data"""
@@ -132,15 +127,22 @@ class FastFourierTransform(object):
             fu[:] = rfft2(u, axes=(0,1))
             return fu    
         
-        self.Uc_hatT[:] = rfft(u, axis=1)
-        self.Uc_hatT[:, 0] += 1j*self.Uc_hatT[:, -1]
+        # Work arrays
+        Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
+        U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
+        U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
+        U_recv  = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
+                
+        # Transform in y-direction
+        Uc_hatT[:] = rfft(u, axis=1)
+        Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
         
-        self.U_send = transpose_x(self.U_send, self.Uc_hatT, self.num_processes, self.Np)
+        U_send = transpose_x(U_send, Uc_hatT, self.num_processes, self.Np)
                 
         # Communicate all values
-        self.comm.Alltoall([self.U_send, self.mpitype], [self.U_recv, self.mpitype])
+        self.comm.Alltoall([U_send, self.mpitype], [U_recv, self.mpitype])
         
-        fu[:, :self.Np[1]/2] = fft(self.U_recv, axis=0)
+        fu[:, :self.Np[1]/2] = fft(U_recv, axis=0)
         
         # Handle Nyquist frequency
         if self.rank == 0:        
@@ -156,43 +158,35 @@ class FastFourierTransform(object):
     def ifft2(self, fu, u, dealias=None):
         assert dealias in ('2/3-rule', 'None', None)
         
+        if dealias == '2/3-rule' and self.dealias.shape == (0,):
+            self.dealias = self.get_dealias_filter()
+            
         if dealias == '2/3-rule':
-            if self.dealias is None:
-                self.dealias = self.get_dealias_filter()
             fu *= self.dealias
         
         if self.num_processes == 1:
             u[:] = irfft2(fu, axes=(0,1))
             return u
+        
+        # Get some work arrays
+        Uc_hat  = self.work_arrays[((self.N[0], self.Npf), complex, 0)]
+        Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
+        U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
+        U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
+        U_recv  = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
 
-        self.Uc_hat[:] = ifft(fu, axis=0)    
-        self.U_sendr[:] = self.Uc_hat[:, :self.Np[1]/2]
+        Uc_hat[:] = ifft(fu, axis=0)    
+        U_sendr[:] = Uc_hat[:, :self.Np[1]/2]
 
-        self.comm.Alltoall([self.U_send, self.mpitype], [self.U_recv, self.mpitype])
+        self.comm.Alltoall([U_send, self.mpitype], [U_recv, self.mpitype])
 
-        self.Uc_hatT = transpose_y(self.Uc_hatT, self.U_recv, self.num_processes, self.Np)
+        Uc_hatT = transpose_y(Uc_hatT, U_recv, self.num_processes, self.Np)
         
         if self.rank == self.num_processes-1:
-            self.fft_y[:] = self.Uc_hat[:, -1]
+            self.fft_y[:] = Uc_hat[:, -1]
 
         self.comm.Scatter(self.fft_y, self.plane_recv, root=self.num_processes-1)
-        self.Uc_hatT[:, -1] = self.plane_recv
+        Uc_hatT[:, -1] = self.plane_recv
         
-        u[:] = irfft(self.Uc_hatT, axis=1)
+        u[:] = irfft(Uc_hatT, axis=1)
         return u
-
-    def get_workarray(self, a, i=0):
-        if isinstance(a, np.ndarray):
-            shape = a.shape
-            dtype = a.dtype
-            
-        elif isinstance(a, tuple):
-            assert len(a) == 2
-            shape, dtype = a
-            
-        else:
-            raise TypeError("Wrong type for get_workarray")
-        
-        a = work_arrays[(shape, dtype, i)]
-        a[:] = 0
-        return a
