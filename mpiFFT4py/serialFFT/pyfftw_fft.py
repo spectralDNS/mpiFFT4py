@@ -11,7 +11,6 @@ import pyfftw
 from numpy import iscomplexobj, zeros_like, zeros as npzeros
 from numpy.fft import fftfreq
 
-nthreads = 1
 def empty(N, dtype=float, bytes=16):
     return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
@@ -32,127 +31,127 @@ rfft2_object  = {}
 rfft_object   = {}
 rfftn_object  = {}
     
-def ifft(a, axis=None):
+def ifft(a, axis=None,threads=1):
     global ifft_object
     if not a.shape in ifft_object:
         b = a.copy()
-        ifft_object[a.shape] = pyfftw.builders.ifft(b, axis=axis)    
+        ifft_object[a.shape] = pyfftw.builders.ifft(b, axis=axis,threads=threads)    
         
     in_array = ifft_object[a.shape].get_input_array()
     in_array[:] = a
     return ifft_object[a.shape]()
 
-def ifft2(a, axes=None):
+def ifft2(a, axes=None,threads=1):
     global ifft2_object
     if not a.shape in ifft2_object:
         b = a.copy()
-        ifft2_object[a.shape] = pyfftw.builders.ifft2(b, axes=axes)    
+        ifft2_object[a.shape] = pyfftw.builders.ifft2(b, axes=axes,threads=threads)
         
     in_array = ifft2_object[a.shape].get_input_array()
     in_array[:] = a
     return ifft2_object[a.shape]()
 
-def ifftn(a, axes=None):
+def ifftn(a, axes=None,threads=1):
     global ifftn_object
     if not a.shape in ifftn_object:
         b = a.copy()
-        ifftn_object[a.shape] = pyfftw.builders.ifftn(b, axes=axes)    
+        ifftn_object[a.shape] = pyfftw.builders.ifftn(b, axes=axes,threads=threads)    
         
     in_array = ifftn_object[a.shape].get_input_array()
     in_array[:] = a
     return ifftn_object[a.shape]()
 
-def irfft(a, axis=None):
+def irfft(a, axis=None,threads=1):
     global irfft_object
     if not a.shape in irfft_object:
         b = a.copy()
-        irfft_object[a.shape] = pyfftw.builders.irfft(b, axis=axis)
+        irfft_object[a.shape] = pyfftw.builders.irfft(b, axis=axis,threads=threads)
         
     in_array = irfft_object[a.shape].get_input_array()
     in_array[:] = a
     return irfft_object[a.shape]()
 
-def irfft2(a, axes=None):
+def irfft2(a, axes=None,threads=1):
     global irfft2_object
     if not a.shape in irfft2_object:
         b = a.copy()
-        irfft2_object[a.shape] = pyfftw.builders.irfft2(b, axes=axes)
+        irfft2_object[a.shape] = pyfftw.builders.irfft2(b, axes=axes,threads=threads)
         
     in_array = irfft2_object[a.shape].get_input_array()
     in_array[:] = a
     return irfft2_object[a.shape]()
 
-def irfftn(a, axes=None):
+def irfftn(a, axes=None,threads=1):
     global irfftn_object
     if not a.shape in irfftn_object:
         b = a.copy()
-        irfftn_object[a.shape] = pyfftw.builders.irfftn(b, axes=axes)
+        irfftn_object[a.shape] = pyfftw.builders.irfftn(b, axes=axes,threads=threads)
         
     in_array = irfftn_object[a.shape].get_input_array()
     in_array[:] = a
     return irfftn_object[a.shape]()
 
-def fft(a, axis=None):
+def fft(a, axis=None,threads=1):
     global fft_object
     if not a.shape in fft_object:
         b = a.copy()
-        fft_object[a.shape] = pyfftw.builders.fft(b, axis=axis)
+        fft_object[a.shape] = pyfftw.builders.fft(b, axis=axis,threads=threads)
     
     in_array = fft_object[a.shape].get_input_array()
     in_array[:] = a
     return fft_object[a.shape]()
 
-def fft2(a, axes=None):
+def fft2(a, axes=None,threads=1):
     global fft2_object
     if not a.shape in fft2_object:
         b = a.copy()
-        fft2_object[a.shape] = pyfftw.builders.fft2(b, axes=axes)
+        fft2_object[a.shape] = pyfftw.builders.fft2(b, axes=axes,threads=threads)
     
     in_array = fft2_object[a.shape].get_input_array()
     in_array[:] = a
     return fft2_object[a.shape]()
 
-def fftn(a, axes=None):
+def fftn(a, axes=None,threads=1):
     global fftn_object
     if not a.shape in fftn_object:
         b = a.copy()
-        fftn_object[a.shape] = pyfftw.builders.fftn(b, axes=axes)
+        fftn_object[a.shape] = pyfftw.builders.fftn(b, axes=axes,threads=threads)
     
     in_array = fftn_object[a.shape].get_input_array()
     in_array[:] = a
     return fftn_object[a.shape]()
 
-def rfft(a, axis=None):
+def rfft(a, axis=None,threads=1):
     global rfft_object
     if not a.shape in rfft_object:
         b = a.copy()
-        rfft_object[a.shape] = pyfftw.builders.rfft(b, axis=axis)
+        rfft_object[a.shape] = pyfftw.builders.rfft(b, axis=axis,threads=threads)
         
     in_array = rfft_object[a.shape].get_input_array()
     in_array[:] = a        
     return rfft_object[a.shape]()
 
-def rfft2(a, axes=None):
+def rfft2(a, axes=None,threads=1):
     global rfft2_object
     if not a.shape in rfft2_object:
         b = a.copy()
-        rfft2_object[a.shape] = pyfftw.builders.rfft2(b, axes=axes)
+        rfft2_object[a.shape] = pyfftw.builders.rfft2(b, axes=axes,threads=threads)
         
     in_array = rfft2_object[a.shape].get_input_array()
     in_array[:] = a        
     return rfft2_object[a.shape]()
 
-def rfftn(a, axes=None):
+def rfftn(a, axes=None,threads=1):
     global rfftn_object
     if not a.shape in rfftn_object:
         b = a.copy()
-        rfftn_object[a.shape] = pyfftw.builders.rfftn(b, axes=axes)
+        rfftn_object[a.shape] = pyfftw.builders.rfftn(b, axes=axes,threads=threads)
         
     in_array = rfftn_object[a.shape].get_input_array()
     in_array[:] = a        
     return rfftn_object[a.shape]()
 
-
+#TODO:Figure out how to use threads here
 if hasattr(pyfftw.builders, "dchijt"):
     def dct(a, type=2, axis=0):
         global dct_object

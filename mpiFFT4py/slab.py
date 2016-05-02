@@ -20,9 +20,10 @@ class FastFourierTransform(object):
     The transform is real to complex
     
     """
-    def __init__(self, N, L, MPI, precision, communication="alltoall", padsize=1.5):
+    def __init__(self, N, L, MPI, precision, communication="alltoall", padsize=1.5,threads=1):
         assert len(L) == 3
         assert len(N) == 3
+        self.threads = threads
         self.N = N
         self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction 
         self.Nfp = int(padsize*N[2]/2+1) # Number of independent complex wavenumbers in z-direction for padded array        
@@ -152,7 +153,7 @@ class FastFourierTransform(object):
                 if dealias == '2/3-rule':
                     fu *= self.dealias
                 
-                u[:] = irfftn(fu, axes=(0,1,2))
+                u[:] = irfftn(fu, axes=(0,1,2),threads=self.threads)
             
             else:
                 assert u.shape == self.real_shape_padded()
@@ -169,7 +170,7 @@ class FastFourierTransform(object):
                 #fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
                 #fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[0]/2]
                 
-                u[:] = irfftn(fu_padded*self.padsize**3, axes=(0,1,2))
+                u[:] = irfftn(fu_padded*self.padsize**3, axes=(0,1,2),threads=self.threads)
             return u
         
         if not dealias == '3/2-rule':
@@ -254,13 +255,13 @@ class FastFourierTransform(object):
             if not dealias == '3/2-rule':
                 assert u.shape == self.real_shape()
                 
-                fu[:] = rfftn(u, axes=(0,1,2))
+                fu[:] = rfftn(u, axes=(0,1,2),threads=self.threads)
             
             else:
                 assert u.shape == self.real_shape_padded()
                 
                 fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
-                fu_padded[:] = rfftn(u/self.padsize**3, axes=(0,1,2))
+                fu_padded[:] = rfftn(u/self.padsize**3, axes=(0,1,2),threads=self.threads)
                 
                 # Copy with truncation
                 fu[:self.N[0]/2] = fu_padded[:self.N[0]/2, self.ks, :self.Nf] 
@@ -381,9 +382,9 @@ class FastFourierTransform(object):
 
 class c2c(FastFourierTransform):
     
-    def __init__(self, N, L, MPI, precision, communication="alltoall", padsize=1.5):
+    def __init__(self, N, L, MPI, precision, communication="alltoall", padsize=1.5,threads=1):
         FastFourierTransform.__init__(self, N, L, MPI, precision, 
-                                      communication=communication, padsize=padsize)
+                                      communication=communication, padsize=padsize,threads=threads)
         # Reuse all shapes from r2c transform FastFourierTransform simply by resizing the final complex z-dimension:
         self.Nf = N[2]      
         self.Nfp = int(self.padsize*self.N[2]) # Number of independent complex wavenumbers in z-direction for padded array
@@ -434,7 +435,7 @@ class c2c(FastFourierTransform):
                 if dealias == '2/3-rule':
                     fu *= self.dealias
                 
-                u[:] = ifftn(fu, axes=(0,1,2))
+                u[:] = ifftn(fu, axes=(0,1,2),threads=self.threads)
             
             else:
                 assert u.shape == self.original_shape_padded()
@@ -445,7 +446,7 @@ class c2c(FastFourierTransform):
                 fu_padded[:self.N[0]/2, -self.N[1]/2:, self.ks] = fu[:self.N[0]/2, self.N[1]/2:]
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, self.ks] = fu[self.N[0]/2:, :self.N[1]/2]
                 fu_padded[-self.N[0]/2:, -self.N[1]/2:, self.ks] = fu[self.N[0]/2:, self.N[1]/2:]                                
-                u[:] = ifftn(fu_padded*self.padsize**3, axes=(0,1,2))
+                u[:] = ifftn(fu_padded*self.padsize**3, axes=(0,1,2),threads=self.threads)
                 
             return u
         
@@ -528,13 +529,13 @@ class c2c(FastFourierTransform):
             if not dealias == '3/2-rule':
                 assert u.shape == self.original_shape()
                 
-                fu[:] = fftn(u, axes=(0,1,2))
+                fu[:] = fftn(u, axes=(0,1,2),threads=self.threads)
             
             else:
                 assert u.shape == self.original_shape_padded()
                 
                 fu_padded = self.work_arrays[(u, 0)]
-                fu_padded[:] = fftn(u/self.padsize**3, axes=(0,1,2))
+                fu_padded[:] = fftn(u/self.padsize**3, axes=(0,1,2),threads=self.threads)
                 
                 # Copy with truncation
                 fu[:self.N[0]/2, :self.N[1]/2] = fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks]
