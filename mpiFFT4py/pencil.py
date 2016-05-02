@@ -97,7 +97,8 @@ class FastFourierTransformY(object):
     
     """
 
-    def __init__(self, N, L, MPI, precision, P1=None, padsize=1.5):
+    def __init__(self, N, L, MPI, precision, P1=None, padsize=1.5,threads=1):
+        self.threads = 1
         self.params = params
         self.N = N
         assert len(L) == 3
@@ -273,14 +274,14 @@ class FastFourierTransformY(object):
             if self.params['method'] == 'Nyquist':
                 
                 # Do first owned direction
-                Uc_hat_y[:] = ifft(fu, axis=1)
+                Uc_hat_y[:] = ifft(fu, axis=1,threads=self.threads)
 
                 # Transform to x all but k=N/2 (the neglected Nyquist mode)
                 Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, self.P2)
                     
                 # Communicate in xz-plane and do fft in x-direction
                 self.comm1.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])
-                Uc_hat_x[:] = ifft(Uc_hat_x2, axis=0)
+                Uc_hat_x[:] = ifft(Uc_hat_x2, axis=0,threads=self.threads)
                     
                 # Communicate and transform in xy-plane
                 self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])
@@ -288,7 +289,7 @@ class FastFourierTransformY(object):
                         
                 # Do fft for z-direction
                 Uc_hat_z[:, :, -1] = 0
-                u[:] = irfft(Uc_hat_z, axis=2)
+                u[:] = irfft(Uc_hat_z, axis=2,threads=self.threads)
             
             elif self.params['method'] == 'Swap':
                 
@@ -299,14 +300,14 @@ class FastFourierTransformY(object):
                 xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0)]
                 
                 # Do first owned direction
-                Uc_hat_y[:] = ifft(fu, axis=1)
+                Uc_hat_y[:] = ifft(fu, axis=1,threads=self.threads)
 
                 # Transform to x
                 Uc_hat_xp[:] = transform_Uc_xy(Uc_hat_xp, Uc_hat_y, self.P2)
                     
                 # Communicate in xz-plane and do fft in x-direction
                 self.comm1.Alltoall([Uc_hat_xp, self.mpitype], [Uc_hat_xp2, self.mpitype])
-                Uc_hat_xp[:] = ifft(Uc_hat_xp2, axis=0)
+                Uc_hat_xp[:] = ifft(Uc_hat_xp2, axis=0,threads=self.threads)
                 
                 Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]/2]
                 
@@ -319,7 +320,7 @@ class FastFourierTransformY(object):
                 Uc_hat_z[:, :, -1] = xy_recv
                 
                 # Do ifft for z-direction
-                u[:] = irfft(Uc_hat_z, axis=2)
+                u[:] = irfft(Uc_hat_z, axis=2,threads=self.threads)
 
             return u
         
@@ -341,7 +342,7 @@ class FastFourierTransformY(object):
                 Uc_pad_hat_y2 = self.copy_to_padded_y(fu, Uc_pad_hat_y2)
                 
                 # Do first owned direction
-                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y2*padsize, axis=1)
+                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y2*padsize, axis=1,threads=self.threads)
 
                 # Transform to x all but k=N/2 (the neglected Nyquist mode)
                 Uc_pad_hat_x[:] = transform_Uc_xy(Uc_pad_hat_x, Uc_pad_hat_y, self.P2)
@@ -351,7 +352,7 @@ class FastFourierTransformY(object):
                 
                 # Pad and do fft in x-direction
                 Uc_pad_hat_xy = self.copy_to_padded_x(Uc_pad_hat_xr, Uc_pad_hat_xy)
-                Uc_pad_hat_xy2[:] = ifft(Uc_pad_hat_xy*padsize, axis=0)
+                Uc_pad_hat_xy2[:] = ifft(Uc_pad_hat_xy*padsize, axis=0,threads=self.threads)
                     
                 # Communicate in xy-plane
                 self.comm0.Alltoall([Uc_pad_hat_xy2, self.mpitype], [Uc_pad_hat_xy, self.mpitype])
@@ -365,7 +366,7 @@ class FastFourierTransformY(object):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                 
                 # Do ifft for z-direction
-                u[:] = irfft(Uc_pad_hat_z2*padsize, axis=2)
+                u[:] = irfft(Uc_pad_hat_z2*padsize, axis=2,threads=self.threads)
             
             elif self.params['method'] == 'Swap':
                 
@@ -380,7 +381,7 @@ class FastFourierTransformY(object):
                 Uc_pad_hat_y2 = self.copy_to_padded_y(fu, Uc_pad_hat_y2)
 
                 # Transform first owned direction
-                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y2*padsize, axis=1)
+                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y2*padsize, axis=1,threads=self.threads)
 
                 # Transpose datastructure to x
                 Uc_pad_hat_xr2[:] = transform_Uc_xy(Uc_pad_hat_xr2, Uc_pad_hat_y, self.P2)
@@ -390,7 +391,7 @@ class FastFourierTransformY(object):
                 
                 # Pad and do fft in x-direction
                 Uc_pad_hat_xy3 = self.copy_to_padded_x(Uc_pad_hat_xr3, Uc_pad_hat_xy3)
-                Uc_pad_hat_xy4[:] = ifft(Uc_pad_hat_xy3*padsize, axis=0)
+                Uc_pad_hat_xy4[:] = ifft(Uc_pad_hat_xy3*padsize, axis=0,threads=self.threads)
                                 
                 Uc_pad_hat_xy2[:] = Uc_pad_hat_xy4[:, :, :N1[2]/2]
                 
@@ -407,7 +408,7 @@ class FastFourierTransformY(object):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                 
                 # Do ifft for z-direction
-                u[:] = irfft(Uc_pad_hat_z2*padsize, axis=2)
+                u[:] = irfft(Uc_pad_hat_z2*padsize, axis=2,threads=self.threads)
 
             return u
             
@@ -428,21 +429,21 @@ class FastFourierTransformY(object):
 
             if self.params['method'] == 'Nyquist':
                 # Do fft in z direction on owned data
-                Uc_hat_z[:] = rfft(u, axis=2)
+                Uc_hat_z[:] = rfft(u, axis=2,threads=self.threads)
                 
                 # Transform to x direction neglecting k=N/2 (Nyquist)
                 Uc_hat_x = transform_Uc_xz(Uc_hat_x, Uc_hat_z, self.P1)
                 
                 # Communicate and do fft in x-direction
                 self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])
-                Uc_hat_x[:] = fft(Uc_hat_x2, axis=0)        
+                Uc_hat_x[:] = fft(Uc_hat_x2, axis=0,threads=self.threads)
                 
                 # Communicate and transform to final y-direction
                 self.comm1.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])  
                 Uc_hat_y[:] = transform_Uc_yx(Uc_hat_y, Uc_hat_x2, self.P2)
                                             
                 # Do fft for last direction 
-                fu[:] = fft(Uc_hat_y, axis=1)
+                fu[:] = fft(Uc_hat_y, axis=1,threads=self.threads)
             
             elif self.params['method'] == 'Swap':
                 
@@ -454,7 +455,7 @@ class FastFourierTransformY(object):
                 xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0)]
 
                 # Do fft in z direction on owned data
-                Uc_hat_z[:] = rfft(u, axis=2)
+                Uc_hat_z[:] = rfft(u, axis=2,threads=self.threads)
                 
                 # Move real part of Nyquist to k=0
                 Uc_hat_z[:, :, 0] += 1j*Uc_hat_z[:, :, -1]
@@ -464,7 +465,7 @@ class FastFourierTransformY(object):
                 
                 # Communicate and do fft in x-direction
                 self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])
-                Uc_hat_x[:] = fft(Uc_hat_x2, axis=0)
+                Uc_hat_x[:] = fft(Uc_hat_x2, axis=0,threads=self.threads)
                 Uc_hat_xr2[:, :, :N1[2]/2] = Uc_hat_x[:]
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
@@ -486,7 +487,7 @@ class FastFourierTransformY(object):
                 Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr3, self.P2)
                 
                 # Do fft for last direction 
-                fu[:] = fft(Uc_hat_y, axis=1)
+                fu[:] = fft(Uc_hat_y, axis=1,threads=self.threads)
 
             return fu
         
@@ -506,7 +507,7 @@ class FastFourierTransformY(object):
             
             if self.params['method'] == 'Nyquist':
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2[:] = rfft(u/padsize, axis=2)
+                Uc_pad_hat_z2[:] = rfft(u/padsize, axis=2,threads=self.threads)
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -515,7 +516,7 @@ class FastFourierTransformY(object):
                 
                 # Communicate and do fft in x-direction
                 self.comm0.Alltoall([Uc_pad_hat_xy, self.mpitype], [Uc_pad_hat_xy2, self.mpitype])
-                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy2/padsize, axis=0)
+                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy2/padsize, axis=0,threads=self.threads)
                 
                 Uc_pad_hat_x = self.copy_from_padded_x(Uc_pad_hat_xy, Uc_pad_hat_x)
                 
@@ -524,7 +525,7 @@ class FastFourierTransformY(object):
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_xr, self.P2)
                                             
                 # Do fft for last direction
-                Uc_pad_hat_y2[:] = fft(Uc_pad_hat_y/padsize, axis=1)
+                Uc_pad_hat_y2[:] = fft(Uc_pad_hat_y/padsize, axis=1,threads=self.threads)
                 fu = self.copy_from_padded_y(Uc_pad_hat_y2, fu)
             
             elif self.params['method'] == 'Swap':
@@ -536,7 +537,7 @@ class FastFourierTransformY(object):
                 
                 
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2[:] = rfft(u/padsize, axis=2)
+                Uc_pad_hat_z2[:] = rfft(u/padsize, axis=2,threads=self.threads)
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -548,7 +549,7 @@ class FastFourierTransformY(object):
                 
                 # Communicate and do fft in x-direction
                 self.comm0.Alltoall([Uc_pad_hat_xy, self.mpitype], [Uc_pad_hat_xy2, self.mpitype])
-                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy2/padsize, axis=0)
+                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy2/padsize, axis=0,threads=self.threads)
                 
                 Uc_pad_hat_x = self.copy_from_padded_x(Uc_pad_hat_xy, Uc_pad_hat_x)
                 
@@ -573,7 +574,7 @@ class FastFourierTransformY(object):
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_xr3, self.P2)
                 
                 # Do fft for last direction 
-                Uc_pad_hat_y2[:] = fft(Uc_pad_hat_y/padsize, axis=1)
+                Uc_pad_hat_y2[:] = fft(Uc_pad_hat_y/padsize, axis=1,threads=self.threads)
                 fu = self.copy_from_padded_y(Uc_pad_hat_y2, fu)
 
             return fu
@@ -593,8 +594,8 @@ class FastFourierTransformX(FastFourierTransformY):
     FIXME Need to install swap version
     """
     
-    def __init__(self, N, L, MPI, precision, P1=None):
-        FastFourierTransformY.__init__(self, N, L, MPI, precision, P1=P1)
+    def __init__(self, N, L, MPI, precision, P1=None,threads=1):
+        FastFourierTransformY.__init__(self, N, L, MPI, precision, P1=P1,threads=threads)
 
     def init_work_arrays(self):
         # Initialize MPI work arrays globally
@@ -690,7 +691,7 @@ class FastFourierTransformX(FastFourierTransformY):
         
         # Transform to y all but k=N/2 (the neglected Nyquist mode)
         Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr, self.P1)            
-        Uc_hat_y[:] = ifft(Uc_hat_y, axis=1)
+        Uc_hat_y[:] = ifft(Uc_hat_y, axis=1,threads=self.threads)
             
         # Communicate and transform in yz-plane
         Uc_hat_y_T[:] = Uc_hat_y.transpose((1, 0, 2))
@@ -701,7 +702,7 @@ class FastFourierTransformX(FastFourierTransformY):
                 
         # Do ifft for y-direction
         Uc_hat_z[:, :, -1] = 0
-        u[:] = irfft(Uc_hat_z, axis=2)
+        u[:] = irfft(Uc_hat_z, axis=2,threads=self.threads)
         return u
 
     def fftn(self, u, fu, dealias=None):
@@ -719,7 +720,7 @@ class FastFourierTransformX(FastFourierTransformY):
         Uc_hat_yr_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 1)]
         
         # Do fft in z direction on owned data
-        Uc_hat_z[:] = rfft(u, axis=2)
+        Uc_hat_z[:] = rfft(u, axis=2,threads=self.threads)
         
         # Transform to y direction neglecting k=N/2 (Nyquist)
         Uc_hat_y = transform_Uc_yz(Uc_hat_y, Uc_hat_z, self.P2)
@@ -729,14 +730,14 @@ class FastFourierTransformX(FastFourierTransformY):
         self.comm1.Alltoall([Uc_hat_y_T, self.mpitype], 
                             [Uc_hat_yr_T, self.mpitype])
         Uc_hat_y[:] = Uc_hat_yr_T.transpose((1, 0, 2))
-        Uc_hat_yr[:] = fft(Uc_hat_y, axis=1)
+        Uc_hat_yr[:] = fft(Uc_hat_y, axis=1,threads=self.threads)
         
         # Communicate and transform to final z-direction
         Uc_hat_x = transform_Uc_xy(Uc_hat_x, Uc_hat_yr, self.P1)
         self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_xr, self.mpitype])  
                                     
         # Do fft for last direction 
-        fu[:] = fft(Uc_hat_xr, axis=0)
+        fu[:] = fft(Uc_hat_xr, axis=0,threads=self.threads)
         return fu
 
 def FastFourierTransform(N, L, MPI, precision, P1=None, **kwargs):

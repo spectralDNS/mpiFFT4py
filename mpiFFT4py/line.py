@@ -53,7 +53,8 @@ class FastFourierTransform(object):
         
     """
     
-    def __init__(self, N, L, MPI, precision):
+    def __init__(self, N, L, MPI, precision,threads=1):
+        self.threads = threads
         self.N = N         # The global size of the problem
         self.L = L
         assert len(L) == 2
@@ -124,7 +125,7 @@ class FastFourierTransform(object):
         assert dealias in ('2/3-rule', 'None', None)
         
         if self.num_processes == 1:
-            fu[:] = rfft2(u, axes=(0,1))
+            fu[:] = rfft2(u, axes=(0,1),threads=self.threads)
             return fu    
         
         # Work arrays
@@ -134,7 +135,7 @@ class FastFourierTransform(object):
         U_recv  = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
                 
         # Transform in y-direction
-        Uc_hatT[:] = rfft(u, axis=1)
+        Uc_hatT[:] = rfft(u, axis=1,threads=self.threads)
         Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
         
         U_send = transpose_x(U_send, Uc_hatT, self.num_processes, self.Np)
@@ -142,7 +143,7 @@ class FastFourierTransform(object):
         # Communicate all values
         self.comm.Alltoall([U_send, self.mpitype], [U_recv, self.mpitype])
         
-        fu[:, :self.Np[1]/2] = fft(U_recv, axis=0)
+        fu[:, :self.Np[1]/2] = fft(U_recv, axis=0,threads=self.threads)
         
         # Handle Nyquist frequency
         if self.rank == 0:        
@@ -165,7 +166,7 @@ class FastFourierTransform(object):
             fu *= self.dealias
         
         if self.num_processes == 1:
-            u[:] = irfft2(fu, axes=(0,1))
+            u[:] = irfft2(fu, axes=(0,1),threads=self.threads)
             return u
         
         # Get some work arrays
@@ -175,7 +176,7 @@ class FastFourierTransform(object):
         U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
         U_recv  = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
 
-        Uc_hat[:] = ifft(fu, axis=0)    
+        Uc_hat[:] = ifft(fu, axis=0,threads=self.threads)
         U_sendr[:] = Uc_hat[:, :self.Np[1]/2]
 
         self.comm.Alltoall([U_send, self.mpitype], [U_recv, self.mpitype])
@@ -188,5 +189,5 @@ class FastFourierTransform(object):
         self.comm.Scatter(self.fft_y, self.plane_recv, root=self.num_processes-1)
         Uc_hatT[:, -1] = self.plane_recv
         
-        u[:] = irfft(Uc_hatT, axis=1)
+        u[:] = irfft(Uc_hatT, axis=1,threads=self.threads)
         return u

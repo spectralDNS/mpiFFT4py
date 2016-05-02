@@ -9,7 +9,7 @@ __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
 
 import pyfftw
 from numpy import iscomplexobj, zeros_like, zeros as npzeros
-from numpy.fft import fftfreq
+from numpy.fft import fftfreq,rfftfreq
 
 def empty(N, dtype=float, bytes=16):
     return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
