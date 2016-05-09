@@ -7,11 +7,17 @@ import numpy as np
 from mpi4py import MPI
 import collections
 
+try:
+    from serialFFT.pyfftw_fft import zeros, empty
+    
+except:
+    zeros, empty = np.zeros, np.empty
+    
 class work_array_dict(dict):
     """Dictionary of work arrays indexed by their shape, type and an indicator i."""
     def __missing__(self, key):
         shape, dtype, i = key
-        a = np.zeros(shape, dtype=dtype)
+        a = zeros(shape, dtype=dtype)
         self[key] = a
         return self[key]
 
