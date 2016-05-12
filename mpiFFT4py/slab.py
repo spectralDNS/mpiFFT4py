@@ -277,18 +277,15 @@ class FastFourierTransform(object):
         if not dealias == '3/2-rule':
             if self.communication == 'alltoall':     
                 # Intermediate work arrays required for transform
-                Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
                 
                 # Do 2 ffts in y-z directions on owned data
                 Uc_hatT[:] = rfft2(u, axes=(1,2))
                 
                 # Transform data to align with x-direction  
-                #Uc_mpi[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
                 fu[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1).reshape(fu.shape)
                     
                 # Communicate all values
-                #self.comm.Alltoall([Uc_mpi, self.mpitype], [fu, self.mpitype])  
                 self.comm.Alltoall(self.MPI.IN_PLACE, [fu, self.mpitype])  # Note to self. In place is possible, should test for efficiency
             
             else:

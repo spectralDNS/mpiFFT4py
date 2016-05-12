@@ -37,15 +37,18 @@ class work_arrays(collections.MutableMapping):
         - work = workarrays()
         - a = work[((3,3), np.float, 0)]
         - b = work[(a, 1)]
+        
+    Returns:
+        Numpy array of given shape initialised to zero
 
     """
 
     def __init__(self):
         self.store = work_array_dict()
-
+    
     def __getitem__(self, key):
         val = self.store[self.__keytransform__(key)]
-        val[:] = 0
+        val.fill(0)
         return val
 
     def __setitem__(self, key, value):

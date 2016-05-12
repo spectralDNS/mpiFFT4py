@@ -59,16 +59,18 @@ def test_FFT(FFT):
     else:
         A = zeros((N, N, N), dtype=FFT.float)
 
-    atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
+    atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-5)
     FFT.comm.Bcast(A, root=0)
     a = zeros(FFT.real_shape(), dtype=FFT.float)
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     a[:] = A[FFT.real_local_slice()]
     c = FFT.fftn(a, c)
     B2 = rfftn(A, axes=(0,1,2))
-    assert allclose(c, B2[FFT.complex_local_slice()], rtol, atol)
+    assert all(abs((c - B2[FFT.complex_local_slice()])/c.max()) < rtol)
+    #assert allclose(c, B2[FFT.complex_local_slice()], rtol, atol)
     a = FFT.ifftn(c, a)
-    assert allclose(a, A[FFT.real_local_slice()], rtol, atol)
+    assert all(abs((a - A[FFT.real_local_slice()])/a.max()) < rtol)
+    #assert allclose(a, A[FFT.real_local_slice()], rtol, atol)
 
 def test_FFT2(FFT2):
     if FFT2.rank == 0:
@@ -118,17 +120,8 @@ def test_FFT_padded(FFT_padded):
         Cp[:, N[1]/2] = Cp[:, -N[1]/2]
         
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.float)
-        #Ap2 = irfftn(Cp, axes=(0,1,2))*1.5**3
-        Ap[:] = irfft(ifft(ifft(Cp, axis=0), axis=1), axis=2)*1.5**3
+        Ap[:] = irfftn(Cp, axes=(0,1,2))*1.5**3
         
-        #print 'Ap', np.linalg.norm(Ap2-Ap)
-        
-        #D = C.copy()
-        #p0 = irfft(ifft(ifft(D, axis=0), axis=1), axis=2)
-        #p1 = irfftn(D, axes=(0,1,2))
-        
-        #print 'pp', np.linalg.norm(p1-p0)
-
     else:
         C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.float)
@@ -169,7 +162,7 @@ def test_FFT_c2c(FFT_c2c):
     """Test both padded and unpadded transforms"""
     FFT = FFT_c2c
     N = FFT.N
-    atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
+    atol, rtol = (1e-8, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
 
     if FFT.rank == 0:
         # Create a reference solution using only one CPU 
@@ -225,12 +218,13 @@ def test_FFT_c2c(FFT_c2c):
     c2 = zeros(FFT.transformed_shape(), dtype=FFT.complex)    
     c2 = FFT.fftn(aa, c2)    
     # Verify
-    assert allclose(c2, c, rtol, atol)
+    assert all(abs(c2-c)/c2.max() < rtol)
+    #assert allclose(c2, c, rtol, atol)
 
 
-#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "single", alignment="Y", method='Swap'))
+#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "single", alignment="Y", method='Nyquist'))
 #test_FFT(slab_FFT(array([N, N, N]), L, MPI, "single"))
 #test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "double"))
-#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double"))
+#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "single"))
 #test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="Y", method='Nyquist'))
 #test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "double"))
