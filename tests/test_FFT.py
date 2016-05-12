@@ -17,6 +17,7 @@ L = array([2*pi, 2*pi, 2*pi])
 ks = (fftfreq(N)*N).astype(int)
 
 @pytest.fixture(params=("pencilsys", "pencilsyd", "pencilnys", "pencilnyd",
+                        "pencilnxs", "pencilnxd",
                         "slabs", "slabd"), scope='module')
 def FFT(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
