@@ -7,11 +7,17 @@ import numpy as np
 from mpi4py import MPI
 import collections
 
+try:
+    from serialFFT.pyfftw_fft import zeros, empty
+    
+except:
+    zeros, empty = np.zeros, np.empty
+    
 class work_array_dict(dict):
     """Dictionary of work arrays indexed by their shape, type and an indicator i."""
     def __missing__(self, key):
         shape, dtype, i = key
-        a = np.zeros(shape, dtype=dtype)
+        a = zeros(shape, dtype=dtype)
         self[key] = a
         return self[key]
 
@@ -31,15 +37,18 @@ class work_arrays(collections.MutableMapping):
         - work = workarrays()
         - a = work[((3,3), np.float, 0)]
         - b = work[(a, 1)]
+        
+    Returns:
+        Numpy array of given shape initialised to zero
 
     """
 
     def __init__(self):
         self.store = work_array_dict()
-
+    
     def __getitem__(self, key):
         val = self.store[self.__keytransform__(key)]
-        val[:] = 0
+        val.fill(0)
         return val
 
     def __setitem__(self, key, value):

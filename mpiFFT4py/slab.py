@@ -167,7 +167,7 @@ class FastFourierTransform(object):
                 #fu_padded[:, -self.N[1]/2] *= 0.5
                 #fu_padded[-self.N[0]/2] *= 0.5
                 #fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
-                #fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[0]/2]
+                #fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[1]/2]
                 
                 u[:] = irfftn(fu_padded*self.padsize**3, axes=(0,1,2))
             return u
@@ -178,7 +178,7 @@ class FastFourierTransform(object):
             
             # Intermediate work arrays required for transform
             Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
-            Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
+            #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
             Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
             
             # Do first owned direction
@@ -186,8 +186,10 @@ class FastFourierTransform(object):
                 
             if self.communication == 'alltoall':
                 # Communicate all values
-                self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
-                Uc_hatT[:] = np.rollaxis(Uc_mpi, 1).reshape(Uc_hatT.shape)
+                #self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
+                #Uc_hatT[:] = np.rollaxis(Uc_mpi, 1).reshape(Uc_hatT.shape)
+                self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                Uc_hatT[:] = np.rollaxis(Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf)), 1).reshape(Uc_hatT.shape)
             
             else:
                 Uc_send = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
@@ -204,26 +206,26 @@ class FastFourierTransform(object):
             
             # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
-            U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0)]
             Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
             Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0)]
             Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
             
             # Expand in x-direction and perform ifft
             Upad_hat = self.copy_to_padded_x(fu, Upad_hat)
-            Upad_hat[:] = ifft(Upad_hat*self.padsize, axis=0)        
+            Upad_hat[:] = ifft(Upad_hat, axis=0)
             
             # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir)
-            self.comm.Alltoall([Upad_hat, self.mpitype], [U_mpi, self.mpitype])
+            self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat, self.mpitype])
+            U_mpi = Upad_hat.reshape(self.complex_shape_padded_0_I())
             
             # Transpose data and pad in y-direction before doing ifft. Now data is padded in x and y 
             Upad_hat1[:] = np.rollaxis(U_mpi, 1).reshape(Upad_hat1.shape)
             Upad_hat2 = self.copy_to_padded_y(Upad_hat1, Upad_hat2)
-            Upad_hat2[:] = ifft(Upad_hat2*self.padsize, axis=1)
+            Upad_hat2[:] = ifft(Upad_hat2, axis=1)
             
             # pad in z-direction and perform final irfft
             Upad_hat3 = self.copy_to_padded_z(Upad_hat2, Upad_hat3)
-            u[:] = irfft(Upad_hat3*self.padsize, axis=2)
+            u[:] = irfft(Upad_hat3, axis=2)*self.padsize**3
             
         return u
 
@@ -275,17 +277,16 @@ class FastFourierTransform(object):
         if not dealias == '3/2-rule':
             if self.communication == 'alltoall':     
                 # Intermediate work arrays required for transform
-                Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
                 
                 # Do 2 ffts in y-z directions on owned data
                 Uc_hatT[:] = rfft2(u, axes=(1,2))
                 
                 # Transform data to align with x-direction  
-                Uc_mpi[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
+                fu[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1).reshape(fu.shape)
                     
                 # Communicate all values
-                self.comm.Alltoall([Uc_mpi, self.mpitype], [fu, self.mpitype])  
+                self.comm.Alltoall(self.MPI.IN_PLACE, [fu, self.mpitype])  # Note to self. In place is possible, should test for efficiency
             
             else:
                 # Communicating intermediate result 
@@ -319,8 +320,10 @@ class FastFourierTransform(object):
             Upad_hat1 = self.copy_from_padded(Upad_hat3, Upad_hat1)
             
             # Transpose and commuincate data
-            U_mpi[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1)
-            self.comm.Alltoall([U_mpi, self.mpitype], [Upad_hat0, self.mpitype])
+            #U_mpi[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1)
+            #self.comm.Alltoall([U_mpi, self.mpitype], [Upad_hat0, self.mpitype])
+            Upad_hat0[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1).reshape(Upad_hat0.shape)
+            self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat0, self.mpitype])
             
             # Perform fft of data in x-direction
             Upad_hat[:] = fft(Upad_hat0/self.padsize, axis=0)
