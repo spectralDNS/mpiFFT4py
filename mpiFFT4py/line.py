@@ -43,6 +43,7 @@ class FastFourierTransform(object):
     L - NumPy array([Lx, Ly]) The actual size of the real mesh
     MPI - The MPI object (from mpi4py import MPI)
     precision - "single" or "double"
+    padsize - For performing transforms with padding
         
     """
     
