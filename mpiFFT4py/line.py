@@ -7,20 +7,13 @@ from serialFFT import *
 import numpy as np
 from mpibase import work_arrays, datatypes
 
-def transpose_x(U_send, Uc_hatT, num_processes, Np):
-    # Align data in x-direction
-    #for i in range(num_processes): 
-    #   U_send[i] = Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2]
-    
+def transpose_x(U_send, Uc_hatT, num_processes):
     sx = U_send.shape
     sy = Uc_hatT.shape
-    U_send[:] = np.rollaxis(Uc_hatT[:,:-1].reshape(sy[0], num_processes, sy[0]/2), 1)
+    U_send[:] = np.rollaxis(Uc_hatT[:,:-1].reshape(sy[0], num_processes, sx[2]), 1)
     return U_send
 
-def transpose_y(Uc_hatT, U_recv, num_processes, Np):
-    #for i in range(num_processes): 
-        #Uc_hatT[:, i*Np[1]/2:(i+1)*Np[1]/2] = U_recv[i*Np[0]:(i+1)*Np[0]]
-        
+def transpose_y(Uc_hatT, U_recv, num_processes):
     sx = Uc_hatT.shape
     sy = U_recv.shape
     Uc_hatT[:, :-1] = np.rollaxis(U_recv.reshape(num_processes, sx[0], sy[1]), 1).reshape((sx[0], sx[1]-1))
@@ -29,16 +22,16 @@ def transpose_y(Uc_hatT, U_recv, num_processes, Np):
 def swap_Nq(fft_y, fu, fft_x, N):
     f = fu[:, 0].copy()        
     fft_x[0] = f[0].real
-    fft_x[1:N[0]/2] = 0.5*(f[1:N[0]/2] + np.conj(f[:N[0]/2:-1]))
-    fft_x[N[0]/2] = f[N[0]/2].real        
-    fu[:N[0]/2+1, 0] = fft_x[:N[0]/2+1]        
-    fu[N[0]/2+1:, 0] = np.conj(fft_x[(N[0]/2-1):0:-1])
+    fft_x[1:N/2] = 0.5*(f[1:N/2] + np.conj(f[:N/2:-1]))
+    fft_x[N/2] = f[N/2].real        
+    fu[:N/2+1, 0] = fft_x[:N/2+1]        
+    fu[N/2+1:, 0] = np.conj(fft_x[(N/2-1):0:-1])
     
     fft_y[0] = f[0].imag
-    fft_y[1:N[0]/2] = -0.5*1j*(f[1:N[0]/2] - np.conj(f[:N[0]/2:-1]))
-    fft_y[N[0]/2] = f[N[0]/2].imag
+    fft_y[1:N/2] = -0.5*1j*(f[1:N/2] - np.conj(f[:N/2:-1]))
+    fft_y[N/2] = f[N/2].imag
     
-    fft_y[N[0]/2+1:] = np.conj(fft_y[(N[0]/2-1):0:-1])
+    fft_y[N/2+1:] = np.conj(fft_y[(N/2-1):0:-1])
     return fft_y
 
 class FastFourierTransform(object):
@@ -53,7 +46,7 @@ class FastFourierTransform(object):
         
     """
     
-    def __init__(self, N, L, MPI, precision):
+    def __init__(self, N, L, MPI, precision, padsize=1.5):
         self.N = N         # The global size of the problem
         self.L = L
         assert len(L) == 2
@@ -63,15 +56,15 @@ class FastFourierTransform(object):
         self.float, self.complex, self.mpitype = float, complex, mpitype = datatypes(precision)
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()
+        self.padsize = padsize
         # Each cpu gets ownership of Np indices
         self.Np = N / self.num_processes
         self.Nf = N[1]/2+1
         self.Npf = self.Np[1]/2+1 if self.rank+1 == self.num_processes else self.Np[1]/2
+        self.Nfp = int(padsize*self.N[1]/2+1)
+        self.ks = (fftfreq(N[0])*N[0]).astype(int)
         self.dealias = zeros(0)
         self.work_arrays = work_arrays()
-        self.fft_y = empty(N[0], dtype=complex)
-        self.fft_x = empty(N[0], dtype=complex)
-        self.plane_recv = empty(self.Np[0], dtype=complex)
 
     def real_shape(self):
         """The local shape of the real data"""
@@ -80,10 +73,22 @@ class FastFourierTransform(object):
     def complex_shape(self):
         """The local shape of the complex data"""
         return (self.N[0], self.Npf)
+    
+    def global_complex_shape(self):
+        """The local shape of the complex data"""
+        return (self.N[0], self.Nf)
+    
+    def global_real_shape(self):
+        """The local shape of the complex data"""
+        return (self.N[0], self.N[1])    
 
-    def real_local_slice(self):
-        return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
-                slice(0, self.N[1]))
+    def real_local_slice(self, padded=False):
+        if padded:
+            return (slice(int(self.padsize*self.rank*self.Np[0]), int(self.padsize*(self.rank+1)*self.Np[0]), 1),
+                    slice(0, int(self.padsize*self.N[1])))
+        else:
+            return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
+                    slice(0, self.N[1]))
     
     def complex_local_slice(self):
         return (slice(0, self.N[0]), 
@@ -119,74 +124,191 @@ class FastFourierTransform(object):
         kmax = 2./3.*(self.N/2+1)
         dealias = np.array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1]), dtype=np.uint8)
         return dealias
+    
+    def global_complex_shape_padded(self):
+        """Global size of problem in complex wavenumber space"""
+        return (int(self.padsize*self.N[0]), int(self.padsize*self.N[1]/2+1))
+    
+    def real_shape_padded(self):
+        """The local shape of the real data"""
+        return (int(self.padsize*self.Np[0]), int(self.padsize*self.N[1]))
+
+    def complex_padded_xy(self):
+        """The local shape of the real data"""
+        return (int(self.padsize*self.Np[0]), int(self.padsize*self.N[1]/2+1))
+
+    def complex_shape_padded_01(self):
+        """The local shape of the real data"""
+        return (int(self.padsize*self.Np[0]), self.Nf)    
+    
+    def complex_padded_x(self):
+        """Padding in x-direction"""
+        return (int(self.padsize*self.N[0]), self.Npf)
+
+    def copy_to_padded_x(self, fu, fp):
+        fp[:self.N[0]/2] = fu[:self.N[0]/2]
+        fp[-(self.N[0]/2):] = fu[self.N[0]/2:]
+        return fp
+
+    def copy_to_padded_y(self, fu, fp):
+        fp[:, :self.Nf] = fu[:]
+        return fp
+    
+    def copy_from_padded_y(self, fp, fu):
+        fu[:] = fp[:, :self.Nf]
+        return fu
 
     def fft2(self, u, fu, dealias=None):
-        assert dealias in ('2/3-rule', 'None', None)
+        assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
         
         if self.num_processes == 1:
-            fu[:] = rfft2(u, axes=(0,1))
+            if not dealias == '3/2-rule':
+                fu[:] = rfft2(u, axes=(0,1))
+                
+            else:
+                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
+                fu_padded[:] = rfft2(u/self.padsize**2, axes=(0,1))                
+                fu[:] = fu_padded[self.ks, :self.Nf]
+                
             return fu    
         
-        # Work arrays
-        Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
-        U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
-        U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
-        U_recv  = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
-                
-        # Transform in y-direction
-        Uc_hatT[:] = rfft(u, axis=1)
-        Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
+        if not dealias == '3/2-rule':
         
-        U_send = transpose_x(U_send, Uc_hatT, self.num_processes, self.Np)
-                
-        # Communicate all values
-        self.comm.Alltoall([U_send, self.mpitype], [U_recv, self.mpitype])
-        
-        fu[:, :self.Np[1]/2] = fft(U_recv, axis=0)
-        
-        # Handle Nyquist frequency
-        if self.rank == 0:        
-            self.fft_y = swap_Nq(self.fft_y, fu, self.fft_x, self.N)
-            self.comm.Send([self.fft_y, self.mpitype], dest=self.num_processes-1, tag=77)
+            # Work arrays
+            Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
+            U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
+            U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
+            fft_y = self.work_arrays[((self.N[0],), self.complex, 0)]
+            fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
+            plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
             
-        elif self.rank == self.num_processes-1:
-            self.comm.Recv([self.fft_y, self.mpitype], source=0, tag=77)
-            fu[:, -1] = self.fft_y 
+            # Transform in y-direction
+            Uc_hatT[:] = rfft(u, axis=1)
+            Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
             
+            U_send = transpose_x(U_send, Uc_hatT, self.num_processes)
+                    
+            # Communicate all values
+            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
+            
+            fu[:, :self.Np[1]/2] = fft(U_sendr, axis=0)
+            
+            # Handle Nyquist frequency
+            if self.rank == 0:        
+                fft_y = swap_Nq(fft_y, fu, fft_x, self.N[0])
+                self.comm.Send([fft_y, self.mpitype], dest=self.num_processes-1, tag=77)
+                
+            elif self.rank == self.num_processes-1:
+                self.comm.Recv([fft_y, self.mpitype], source=0, tag=77)
+                fu[:, -1] = fft_y 
+                
+        else:
+            # Work arrays
+            U_send  = self.work_arrays[((self.num_processes, int(self.padsize*self.Np[0]), self.Np[1]/2), complex, 0)]
+            U_sendr = U_send.reshape((int(self.padsize*self.N[0]), self.Np[1]/2))
+            fu_padded_xy = self.work_arrays[(self.complex_padded_xy(), self.complex, 0)]
+            fu_padded_xy2 = self.work_arrays[(self.complex_shape_padded_01(), self.complex, 0)]
+            fft_y = self.work_arrays[((self.N[0],), self.complex, 0)]
+            fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
+            plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
+                    
+            # Transform in y-direction
+            fu_padded_xy[:] = rfft(u/self.padsize, axis=1)
+            fu_padded_xy2 = self.copy_from_padded_y(fu_padded_xy, fu_padded_xy2)
+            fu_padded_xy2[:, 0] += 1j*fu_padded_xy2[:, -1]
+            
+            U_send = transpose_x(U_send, fu_padded_xy2, self.num_processes)
+                    
+            # Communicate all values
+            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
+            
+            U_sendr[:] = fft(U_sendr/self.padsize, axis=0)
+            
+            fu[:, :self.Np[1]/2] = U_sendr[self.ks]
+            
+            # Handle Nyquist frequency
+            if self.rank == 0:        
+                fft_y = swap_Nq(fft_y, fu, fft_x, self.N[0])
+                self.comm.Send([fft_y, self.mpitype], dest=self.num_processes-1, tag=77)
+                
+            elif self.rank == self.num_processes-1:
+                self.comm.Recv([fft_y, self.mpitype], source=0, tag=77)
+                fu[:, -1] = fft_y
+                
         return fu
 
     def ifft2(self, fu, u, dealias=None):
-        assert dealias in ('2/3-rule', 'None', None)
+        assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
         
         if dealias == '2/3-rule' and self.dealias.shape == (0,):
             self.dealias = self.get_dealias_filter()
-            
+
         if dealias == '2/3-rule':
             fu *= self.dealias
-        
+            
         if self.num_processes == 1:
-            u[:] = irfft2(fu, axes=(0,1))
+            if not dealias == '3/2-rule':                
+                u[:] = irfft2(fu, axes=(0,1))
+            
+            else:
+                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
+                fu_padded[self.ks, :self.Nf] = fu[:]
+                u[:] = irfft2(fu_padded*self.padsize**2, axes=(0,1))
+                
             return u
-        
-        # Get some work arrays
-        Uc_hat  = self.work_arrays[((self.N[0], self.Npf), complex, 0)]
-        Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
-        U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
-        U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
-        U_recv  = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
 
-        Uc_hat[:] = ifft(fu, axis=0)    
-        U_sendr[:] = Uc_hat[:, :self.Np[1]/2]
+        if not dealias == '3/2-rule':
+            # Get some work arrays            
+            Uc_hat  = self.work_arrays[((self.N[0], self.Npf), complex, 0)]
+            Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
+            U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
+            U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
+            fft_y = self.work_arrays[((self.N[0],), self.complex, 0)]
+            fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
+            plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
 
-        self.comm.Alltoall([U_send, self.mpitype], [U_recv, self.mpitype])
+            Uc_hat[:] = ifft(fu, axis=0)    
+            U_sendr[:] = Uc_hat[:, :self.Np[1]/2]
 
-        Uc_hatT = transpose_y(Uc_hatT, U_recv, self.num_processes, self.Np)
-        
-        if self.rank == self.num_processes-1:
-            self.fft_y[:] = Uc_hat[:, -1]
+            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
 
-        self.comm.Scatter(self.fft_y, self.plane_recv, root=self.num_processes-1)
-        Uc_hatT[:, -1] = self.plane_recv
-        
-        u[:] = irfft(Uc_hatT, axis=1)
+            Uc_hatT = transpose_y(Uc_hatT, U_sendr, self.num_processes)
+            
+            if self.rank == self.num_processes-1:
+                fft_y[:] = Uc_hat[:, -1]
+
+            self.comm.Scatter(fft_y, plane_recv, root=self.num_processes-1)
+            Uc_hatT[:, -1] = plane_recv
+            
+            u[:] = irfft(Uc_hatT, axis=1)
+            
+        else:
+            U_send  = self.work_arrays[((self.num_processes, int(self.padsize*self.Np[0]), self.Np[1]/2), complex, 0)]
+            U_sendr = U_send.reshape((int(self.padsize*self.N[0]), self.Np[1]/2))
+            Uc_hatT = self.work_arrays[((int(self.padsize*self.Np[0]), self.Nf), complex, 0)]            
+            fu_padded_x = self.work_arrays[(self.complex_padded_x(), self.complex, 0)] 
+            fu_padded_xy = self.work_arrays[(self.complex_padded_xy(), self.complex, 0)]
+            fft_y = self.work_arrays[((int(self.padsize*self.N[0]),), self.complex, 0)]
+            fft_x = self.work_arrays[((int(self.padsize*self.N[0]),), self.complex, 1)]
+            plane_recv = self.work_arrays[((int(self.padsize*self.Np[0]),), self.complex, 2)]
+            
+            fu_padded_x = self.copy_to_padded_x(fu, fu_padded_x)
+            fu_padded_x[:] = ifft(fu_padded_x, axis=0)
+            
+            U_sendr[:] = fu_padded_x[:, :self.Np[1]/2]
+
+            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
+
+            Uc_hatT = transpose_y(Uc_hatT, U_sendr, self.num_processes)
+            
+            if self.rank == self.num_processes-1:
+                fft_y[:] = fu_padded_x[:, -1]
+
+            self.comm.Scatter(fft_y, plane_recv, root=self.num_processes-1)
+            Uc_hatT[:, -1] = plane_recv
+            
+            fu_padded_xy = self.copy_to_padded_y(Uc_hatT, fu_padded_xy)
+            
+            u[:] = irfft(fu_padded_xy, axis=1)*self.padsize**2
+            
         return u

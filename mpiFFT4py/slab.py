@@ -155,11 +155,11 @@ class FastFourierTransform(object):
         if dealias == '2/3-rule' and self.dealias.shape == (0,):
             self.dealias = self.get_dealias_filter()
 
+        if dealias == '2/3-rule':
+            fu *= self.dealias
+
         if self.num_processes == 1:
-            if not dealias == '3/2-rule':
-                if dealias == '2/3-rule':
-                    fu *= self.dealias
-                
+            if not dealias == '3/2-rule':                
                 u[:] = irfftn(fu, axes=(0,1,2))
             
             else:
@@ -181,9 +181,6 @@ class FastFourierTransform(object):
             return u
         
         if not dealias == '3/2-rule':
-            if dealias == '2/3-rule':
-                fu *= self.dealias
-            
             # Intermediate work arrays required for transform
             Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
             #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
@@ -319,8 +316,7 @@ class FastFourierTransform(object):
             Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
             Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0)]
             Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
-            U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0)]
-
+            
             # Do ffts in the padded y and z directions
             Upad_hat3[:] = rfft2(u/self.padsize**2, axes=(1,2))        
             
@@ -328,8 +324,6 @@ class FastFourierTransform(object):
             Upad_hat1 = self.copy_from_padded(Upad_hat3, Upad_hat1)
             
             # Transpose and commuincate data
-            #U_mpi[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1)
-            #self.comm.Alltoall([U_mpi, self.mpitype], [Upad_hat0, self.mpitype])
             Upad_hat0[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1).reshape(Upad_hat0.shape)
             self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat0, self.mpitype])
             

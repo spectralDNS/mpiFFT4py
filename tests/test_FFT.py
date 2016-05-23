@@ -29,23 +29,11 @@ def FFT(request):
     else:
         return slab_FFT(array([N, N, N]), L, MPI, prec)
 
-@pytest.fixture(params=("slabs", "slabd", 
-                        "pencilsys", "pencilsyd", "pencilnys", "pencilnyd",
-                        "pencilsxs", "pencilsxd", "pencilnxs", "pencilnxd"), scope='module')
-def FFT_padded(request):
-    prec = {"s": "single", "d":"double"}[request.param[-1]]
-    if request.param[:3] == "pen":
-        if request.param[-3] == 's':
-            return pencil_FFT(array([N, N, N]), L, MPI, prec, None, method='Swap', alignment=string.upper(request.param[-2]))
-        elif request.param[-3] == 'n':
-            return pencil_FFT(array([N, N, N]), L, MPI, prec, None, method='Nyquist', alignment=string.upper(request.param[-2]))
-    else:
-        return slab_FFT(array([N, N, N]), L, MPI, prec)
-
 @pytest.fixture(params=("lines", "lined"), scope='module')
 def FFT2(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
     return line_FFT(array([N, N]), L[:-1], MPI, prec)
+
 
 @pytest.fixture(params=("slabd", "slabs"), scope='module')
 def FFT_c2c(request):
@@ -100,8 +88,58 @@ def test_FFT2(FFT2):
     a = FFT2.ifft2(c, a)
     assert allclose(a, A[FFT2.real_local_slice()], rtol, atol)
 
-def test_FFT_padded(FFT_padded):
-    FFT = FFT_padded
+def test_FFT2_padded(FFT2):
+    FFT = FFT2
+    N = FFT.N
+    if FFT.rank == 0:
+        A = random(N).astype(FFT.float)
+        C = zeros((FFT.global_complex_shape()), dtype=FFT.complex)
+        C[:] = rfft2(A, axes=(0,1))
+        
+        # Eliminate Nyquist, otherwise test will fail
+        C[-N[0]/2] = 0
+        A[:] = irfft2(C)
+        
+        Cp = zeros((3*N[0]/2, 3*N[1]/4+1), dtype=FFT.complex)
+        Nf = N[1]/2+1
+        ks = (fftfreq(N[0], 1./N[0])).astype(int)
+        Cp[ks, :Nf] = C[:]
+                
+        Ap = zeros((3*N[0]/2, 3*N[1]/2), dtype=FFT.float)
+        Ap[:] = irfft2(Cp, axes=(0,1))*1.5**2
+        
+    else:
+        C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
+        Ap = zeros((3*N[0]/2, 3*N[1]/2), dtype=FFT.float)
+        A = zeros(N, dtype=FFT.float)
+        
+    FFT.comm.Bcast(C, root=0)
+    FFT.comm.Bcast(Ap, root=0)
+    FFT.comm.Bcast(A, root=0)
+    
+    ae = zeros(FFT.real_shape_padded(), dtype=FFT.float)
+    c = zeros(FFT.complex_shape(), dtype=FFT.complex)
+    
+    c[:] = C[FFT.complex_local_slice()]
+    ae[:] = Ap[FFT.real_local_slice(padded=True)]
+    
+    ap = zeros(FFT.real_shape_padded(), dtype=FFT.float)
+    cp = zeros(FFT.complex_shape(), dtype=FFT.complex)
+    ap = FFT.ifft2(c, ap, dealias="3/2-rule")
+    
+    atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
+    
+    #from IPython import embed; embed()
+    #print np.linalg.norm(ap-ae)
+    assert allclose(ap, ae, rtol, atol)
+    
+    cp = FFT.fft2(ap, cp, dealias="3/2-rule")    
+    
+    #print np.linalg.norm(abs((cp-c)/cp.max()))
+    assert all(abs((cp-c)/cp.max()) < rtol)
+
+
+def test_FFT_padded(FFT):
     N = FFT.N
     if FFT.rank == 0:
         A = random(N).astype(FFT.float)
@@ -247,6 +285,7 @@ def test_FFT_c2c(FFT_c2c):
 #test_FFT(slab_FFT(array([N, N, N]), L, MPI, "single"))
 #test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", method='Swap'))
 #test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "double"))
+#test_FFT2_padded(line_FFT(array([N, N]), L[:-1], MPI, "double"))
 #test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "single"))
 #test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="X", method='Swap'))
 #test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "double"))
