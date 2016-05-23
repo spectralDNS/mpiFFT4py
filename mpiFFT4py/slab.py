@@ -72,6 +72,14 @@ class FastFourierTransform(object):
         """Global size of problem in complex wavenumber space"""
         return (int(self.padsize*self.N[0]), int(self.padsize*self.N[1]), self.Nfp)
     
+    def work_shape(self, dealias):
+        """Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved"""
+        if dealias == '3/2-rule':
+            return self.real_shape_padded()
+        
+        else:
+            return self.real_shape()
+    
     def real_local_slice(self, padded=False):
         if padded:
             return (slice(int(self.padsize*self.rank*self.Np[0]), int(self.padsize*(self.rank+1)*self.Np[0]), 1),

@@ -124,6 +124,14 @@ class FastFourierTransformY(object):
     def real_shape_padded(self):
         return (int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), int(self.padsize*self.N[2]))
 
+    def work_shape(self, dealias):
+        """Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved"""
+        if dealias == '3/2-rule':
+            return self.real_shape_padded()
+        
+        else:
+            return self.real_shape()
+
     def real_local_slice(self, padded=False):
         xzrank = self.comm0.Get_rank() # Local rank in xz-plane
         xyrank = self.comm1.Get_rank() # Local rank in xy-plane
