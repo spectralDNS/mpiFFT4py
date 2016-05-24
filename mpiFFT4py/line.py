@@ -145,6 +145,14 @@ class FastFourierTransform(object):
     def complex_padded_x(self):
         """Padding in x-direction"""
         return (int(self.padsize*self.N[0]), self.Npf)
+    
+    def work_shape(self, dealias):
+        """Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved"""
+        if dealias == '3/2-rule':
+            return self.real_shape_padded()
+        
+        else:
+            return self.real_shape()
 
     def copy_to_padded_x(self, fu, fp):
         fp[:self.N[0]/2] = fu[:self.N[0]/2]
