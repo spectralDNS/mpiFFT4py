@@ -12,7 +12,7 @@ from mpiFFT4py.line import FastFourierTransform as line_FFT
 from mpiFFT4py import rfft2, rfftn, irfftn, irfft2, fftn, ifftn, irfft, ifft
 from mpiFFT4py.slab import c2c
 
-N = 2**7
+N = 2**6
 L = array([2*pi, 2*pi, 2*pi])
 ks = (fftfreq(N)*N).astype(int)
 
@@ -44,8 +44,8 @@ def FFT_c2c(request):
 def test_FFT(FFT):
     if FFT.rank == 0:
         A = random((N, N, N)).astype(FFT.float)
-        if hasattr(FFT, 'params'):
-            if FFT.params['method'] == 'Nyquist':
+        if hasattr(FFT, 'pencilparams'):
+            if FFT.pencilparams['method'] == 'Nyquist':
                 C = rfftn(A, axes=(0,1,2))
                 C[:, :, -1] = 0  # Remove Nyquist frequency
                 A[:] = irfftn(C, axes=(0,1,2))
@@ -149,8 +149,8 @@ def test_FFT_padded(FFT):
         # Eliminate Nyquist, otherwise test will fail
         C[-N[0]/2] = 0
         C[:, -N[1]/2] = 0
-        if hasattr(FFT, 'params'):
-            if FFT.params['method'] == 'Nyquist':
+        if hasattr(FFT, 'pencilparams'):
+            if FFT.pencilparams['method'] == 'Nyquist':
                 C[:, :, -1] = 0  # Remove Nyquist frequency
         
         A[:] = irfftn(C)

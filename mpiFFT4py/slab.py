@@ -445,7 +445,7 @@ class c2c(FastFourierTransform):
                 assert u.shape == self.original_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = self.work_arrays[(u.shape, 0)]
+                fu_padded = self.work_arrays[(u, 0)]
                 fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks] = fu[:self.N[0]/2, :self.N[1]/2]
                 fu_padded[:self.N[0]/2, -self.N[1]/2:, self.ks] = fu[:self.N[0]/2, self.N[1]/2:]
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, self.ks] = fu[self.N[0]/2:, :self.N[1]/2]
