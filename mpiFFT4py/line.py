@@ -192,7 +192,7 @@ class FastFourierTransform(object):
             plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
             
             # Transform in y-direction
-            Uc_hatT[:] = rfft(u, axis=1,threas=self.threads)
+            Uc_hatT[:] = rfft(u, axis=1,threads=self.threads)
             Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
             
             U_send = transpose_x(U_send, Uc_hatT, self.num_processes)
