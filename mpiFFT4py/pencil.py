@@ -9,9 +9,9 @@ from mpibase import work_arrays, datatypes
 
 #__all__ = ['FastFourierTransform']
 
-params = {'alignment': 'X',
-          'P1': 2,
-          'method': 'Swap'}
+pencilparams = {'alignment': 'X',
+                'P1': 2,
+                'method': 'Swap'}
 
 def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1):
     sz = Uc_hat_z.shape
@@ -68,7 +68,7 @@ class FastFourierTransformY(object):
     """
 
     def __init__(self, N, L, MPI, precision, P1=None, padsize=1.5):
-        self.params = params
+        self.pencilparams = pencilparams
         self.N = N
         assert len(L) == 3
         assert len(N) == 3
@@ -96,7 +96,7 @@ class FastFourierTransformY(object):
         self.comm1_rank = self.comm1.Get_rank()
         self.work_arrays = work_arrays()
         self.N1f = self.N1[2]/2 if self.comm0_rank < self.P1-1 else self.N1[2]/2+1
-        if self.params['method'] == 'Nyquist':
+        if self.pencilparams['method'] == 'Nyquist':
             self.N1f = self.N1[2]/2
         
         if not (self.num_processes % 2 == 0 or self.num_processes == 1):
@@ -248,7 +248,7 @@ class FastFourierTransformY(object):
             Uc_hat_z  = self.work_arrays[((N1[0], N2[1], Nf), self.complex, 0)]
             Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0)]
 
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
                 
                 # Do first owned direction
                 Uc_hat_y[:] = ifft(fu, axis=1)
@@ -268,7 +268,7 @@ class FastFourierTransformY(object):
                 Uc_hat_z[:, :, -1] = 0
                 u[:] = irfft(Uc_hat_z, axis=2)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 
                 # Additional work arrays
                 Uc_hat_xp = self.work_arrays[((N[0], N2[1], N1f), self.complex, 0)]
@@ -310,7 +310,7 @@ class FastFourierTransformY(object):
             Uc_pad_hat_z  = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), Nf), self.complex, 0)]
             Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), padsize*N[2]/2+1), self.complex, 0)]
 
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
                 
                 Uc_pad_hat_y = self.copy_to_padded_y(fu, Uc_pad_hat_y)
                 
@@ -340,7 +340,7 @@ class FastFourierTransformY(object):
                 # Do ifft for z-direction
                 u[:] = irfft(Uc_pad_hat_z2*padsize, axis=2)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 
                 Uc_pad_hat_xr2  = self.work_arrays[((N[0], int(padsize*N2[1]), N1f), self.complex, 0)]
                 Uc_pad_hat_xy3  = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1f), self.complex, 0)]
@@ -396,7 +396,7 @@ class FastFourierTransformY(object):
             Uc_hat_z  = self.work_arrays[((N1[0], N2[1], Nf), self.complex, 0)]
             Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0)]
 
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
                 # Do fft in z direction on owned data
                 Uc_hat_z[:] = rfft(u, axis=2)
                 
@@ -414,7 +414,7 @@ class FastFourierTransformY(object):
                 # Do fft for last direction 
                 fu[:] = fft(Uc_hat_y, axis=1)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 
                 # Additional work arrays
                 Uc_hat_xr2= self.work_arrays[((N[0], N2[1], N1f), self.complex, 0)]
@@ -470,7 +470,7 @@ class FastFourierTransformY(object):
             Uc_pad_hat_z  = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), Nf), self.complex, 0)]
             Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), padsize*N[2]/2+1), self.complex, 0)]
             
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
                 # Do fft in z direction on owned data
                 Uc_pad_hat_z2[:] = rfft(u/padsize, axis=2)
                 
@@ -493,7 +493,7 @@ class FastFourierTransformY(object):
                 Uc_pad_hat_y[:] = fft(Uc_pad_hat_y/padsize, axis=1)
                 fu = self.copy_from_padded_y(Uc_pad_hat_y, fu)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 
                 xy_pad_plane = self.work_arrays[((N[0], int(padsize*N2[1])), self.complex, 0)]
                 xy_pad_plane2= self.work_arrays[((N[0]/2+1, int(padsize*N2[1])), self.complex, 0)]
@@ -560,7 +560,7 @@ class FastFourierTransformX(FastFourierTransformY):
     def __init__(self, N, L, MPI, precision, P1=None):
         FastFourierTransformY.__init__(self, N, L, MPI, precision, P1=P1)
         self.N2f = self.N2[2]/2 if self.comm1_rank < self.P2-1 else self.N2[2]/2+1
-        if self.params['method'] == 'Nyquist':
+        if self.pencilparams['method'] == 'Nyquist':
             self.N2f = self.N2[2]/2
 
     def real_shape(self):
@@ -643,7 +643,7 @@ class FastFourierTransformX(FastFourierTransformY):
             Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
             Uc_hat_y = Uc_hat_y_T.transpose((1, 0, 2))
             
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
             
                 # Do first owned direction
                 Uc_hat_x[:] = ifft(fu, axis=0)
@@ -663,7 +663,7 @@ class FastFourierTransformX(FastFourierTransformY):
                 Uc_hat_z[:, :, -1] = 0
                 u[:] = irfft(Uc_hat_z, axis=2)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 Uc_hat_y2  = self.work_arrays[((self.N1[0], self.N[1], self.N2f), self.complex, 0)]
                 xy_plane_T  = self.work_arrays[((self.N[1], self.N1[0]), self.complex, 0)]
                 xy_plane  = xy_plane_T.transpose((1, 0))
@@ -703,7 +703,7 @@ class FastFourierTransformX(FastFourierTransformY):
             Uc_pad_hat_xy_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2[2]/2), self.complex, 0)]
             Uc_pad_hat_xy = Uc_pad_hat_xy_T.transpose((1, 0, 2))
             
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
             
                 Uc_pad_hat_x = self.copy_to_padded_x(fu, Uc_pad_hat_x)
                 
@@ -729,7 +729,7 @@ class FastFourierTransformX(FastFourierTransformY):
                 # Do ifft for z-direction
                 u[:] = irfft(Uc_pad_hat_z2*self.padsize, axis=2)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 Uc_pad_hat_y2_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2f), self.complex, 0)]
                 Uc_pad_hat_y2 = Uc_pad_hat_y2_T.transpose((1, 0, 2))
                 Uc_pad_hat_xy2_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2f), self.complex, 0)]
@@ -783,7 +783,7 @@ class FastFourierTransformX(FastFourierTransformY):
             Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
             Uc_hat_y  = Uc_hat_y_T.transpose((1, 0, 2))
             
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
                 
                 # Do fft in z direction on owned data
                 Uc_hat_z[:] = rfft(u, axis=2)
@@ -802,7 +802,7 @@ class FastFourierTransformX(FastFourierTransformY):
                 # Do fft for last direction 
                 fu[:] = fft(Uc_hat_x, axis=0)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 Uc_hat_y2  = self.work_arrays[((self.N1[0], self.N[1], self.N2f), self.complex, 0)]
                 Uc_hat_x2  = self.work_arrays[((self.N[0], self.N1[1], self.N2f), self.complex, 0)]
                 xy_plane_T  = self.work_arrays[((self.N[1], self.N1[0]), self.complex, 0)]
@@ -860,7 +860,7 @@ class FastFourierTransformX(FastFourierTransformY):
             Uc_pad_hat_z  = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), Nf), self.complex, 0)]
             Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), padsize*N[2]/2+1), self.complex, 0)]
             
-            if self.params['method'] == 'Nyquist':
+            if self.pencilparams['method'] == 'Nyquist':
                 
                 # Do fft in z direction on owned data
                 Uc_pad_hat_z2[:] = rfft(u/padsize, axis=2)
@@ -884,7 +884,7 @@ class FastFourierTransformX(FastFourierTransformY):
                 Uc_pad_hat_x[:] = fft(Uc_pad_hat_x/padsize, axis=0)
                 fu = self.copy_from_padded_x(Uc_pad_hat_x, fu)
             
-            elif self.params['method'] == 'Swap':
+            elif self.pencilparams['method'] == 'Swap':
                 Uc_pad_hat_y2_T= self.work_arrays[((N[1], int(padsize*N1[0]), N2f), self.complex, 0)]
                 Uc_pad_hat_y2  = Uc_pad_hat_y2_T.transpose((1, 0, 2))
                 Uc_pad_hat_x2  = self.work_arrays[((int(padsize*N[0]), N1[1], N2f), self.complex, 0)]
@@ -936,9 +936,9 @@ class FastFourierTransformX(FastFourierTransformY):
         return fu
 
 def FastFourierTransform(N, L, MPI, precision, P1=None, **kwargs):
-    global params
-    params.update(kwargs)
-    if params['alignment'] == 'X':
+    global pencilparams
+    pencilparams.update(kwargs)
+    if pencilparams['alignment'] == 'X':
         return FastFourierTransformX(N, L, MPI, precision, P1)
     else:
         return FastFourierTransformY(N, L, MPI, precision, P1)

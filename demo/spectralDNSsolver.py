@@ -5,6 +5,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from numpy import *
 from mpi4py import MPI
+from mpiFFT4py import work_arrays
 from mpiFFT4py.slab import FastFourierTransform
 
 # Set viscosity, end time and time step
@@ -30,6 +31,7 @@ P_hat = empty(FFT.complex_shape(), dtype=complex)
 U_hat0  = empty((3,) + FFT.complex_shape(), dtype=complex)
 U_hat1  = empty((3,) + FFT.complex_shape(), dtype=complex)
 dU      = empty((3,) + FFT.complex_shape(), dtype=complex)
+work = work_arrays()
 X = FFT.get_local_mesh()
 K = FFT.get_scaled_local_wavenumbermesh()
 K2 = sum(K*K, 0, dtype=float)
@@ -39,25 +41,24 @@ b = [0.5, 0.5, 1.]
 dealias = '3/2-rule'  # ('2/3-rule', None)
 
 def Cross(a, b, c):
-    c[0] = FFT.fftn(a[1]*b[2]-a[2]*b[1], c[0], dealias=dealias)
-    c[1] = FFT.fftn(a[2]*b[0]-a[0]*b[2], c[1], dealias=dealias)
-    c[2] = FFT.fftn(a[0]*b[1]-a[1]*b[0], c[2], dealias=dealias)
+    c[0] = FFT.fftn(a[1]*b[2]-a[2]*b[1], c[0], dealias)
+    c[1] = FFT.fftn(a[2]*b[0]-a[0]*b[2], c[1], dealias)
+    c[2] = FFT.fftn(a[0]*b[1]-a[1]*b[0], c[2], dealias)
     return c
 
 def Curl(a, c):
-    c[2] = FFT.ifftn(1j*(K[0]*a[1]-K[1]*a[0]), c[2], dealias=dealias)
-    c[1] = FFT.ifftn(1j*(K[2]*a[0]-K[0]*a[2]), c[1], dealias=dealias)
-    c[0] = FFT.ifftn(1j*(K[1]*a[2]-K[2]*a[1]), c[0], dealias=dealias)
+    c[2] = FFT.ifftn(1j*(K[0]*a[1]-K[1]*a[0]), c[2], dealias)
+    c[1] = FFT.ifftn(1j*(K[2]*a[0]-K[0]*a[2]), c[1], dealias)
+    c[0] = FFT.ifftn(1j*(K[1]*a[2]-K[2]*a[1]), c[0], dealias)
     return c
 
-work_shape = FFT.real_shape_padded() if dealias == '3/2-rule' else FFT.real_shape()
 def computeRHS(dU, rk):
-    U_dealiased = FFT.get_workarray(((3,) + work_shape, float), 0)
-    curl_dealiased = FFT.get_workarray(((3,) + work_shape, float), 1)
+    U_dealiased = work[((3,) + FFT.work_shape(dealias), float, 0)]
+    curl_dealiased = work[((3,) + FFT.work_shape(dealias), float, 1)]
     for i in range(3):
         U_dealiased[i] = FFT.ifftn(U_hat[i], U_dealiased[i], dealias)
 
-    curl_dealiased[:] = Curl(U_hat, curl_dealiased)
+    curl_dealiased = Curl(U_hat, curl_dealiased)
     dU = Cross(U_dealiased, curl_dealiased, dU)
     P_hat[:] = sum(dU*K_over_K2, 0, out=P_hat)
     dU -= P_hat*K
