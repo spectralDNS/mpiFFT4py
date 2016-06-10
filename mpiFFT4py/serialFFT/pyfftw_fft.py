@@ -11,11 +11,10 @@ import pyfftw
 from numpy import iscomplexobj, zeros_like, float64, zeros as npzeros
 from numpy.fft import fftfreq, rfftfreq
 
-nthreads = 1
-def empty(N, dtype=float64, bytes=32):
+def empty(N, dtype=float64, bytes=64):
     return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
-def zeros(N, dtype=float64, bytes=32):
+def zeros(N, dtype=float64, bytes=64):
     return pyfftw.n_byte_align(npzeros(N, dtype=dtype), bytes)
 
 dct_object    = {}
@@ -31,127 +30,101 @@ irfft2_object = {}
 rfft2_object  = {}
 rfft_object   = {}
 rfftn_object  = {}
-    
-def ifft(a, axis=None):
+
+def ifft(a, b, axis=None, overwrite_input=False, threads=1):
     global ifft_object
-    if not a.shape in ifft_object:
-        b = a.copy()
-        ifft_object[(a.shape, a.dtype)] = pyfftw.builders.ifft(b, axis=axis)    
-        
-    in_array = ifft_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return ifft_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axis) in ifft_object:
+        ifft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.ifft(a, axis=axis, overwrite_input=overwrite_input, threads=threads) 
+    ifft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+    return b
 
-def ifft2(a, axes=None):
+def ifft2(a, b=None, axes=None, overwrite_input=False, threads=1):
     global ifft2_object
-    if not a.shape in ifft2_object:
-        b = a.copy()
-        ifft2_object[(a.shape, a.dtype)] = pyfftw.builders.ifft2(b, axes=axes)    
-        
-    in_array = ifft2_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return ifft2_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axes) in ifft2_object:
+        ifft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.ifft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads)
+    ifft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    return b
 
-def ifftn(a, axes=None):
+def ifftn(a, b=None, axes=None, overwrite_input=False, threads=1):
     global ifftn_object
-    if not a.shape in ifftn_object:
-        b = a.copy()
-        ifftn_object[(a.shape, a.dtype)] = pyfftw.builders.ifftn(b, axes=axes)    
-        
-    in_array = ifftn_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return ifftn_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axes) in ifftn_object:
+        ifftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.ifftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads)            
+    ifftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    return b
 
-def irfft(a, axis=None):
+def irfft(a, b, axis=None, overwrite_input=False, threads=1):
     global irfft_object
-    if not a.shape in irfft_object:
-        b = a.copy()
-        irfft_object[(a.shape, a.dtype)] = pyfftw.builders.irfft(b, axis=axis)
-        
-    in_array = irfft_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return irfft_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, axis) in irfft_object:
+        irfft_object[(a.shape, a.dtype, axis)] = pyfftw.builders.irfft(a, axis=axis, threads=threads)
+    if overwrite_input:
+        irfft_object[(a.shape, a.dtype, axis)](a, b)
+    else:
+        irfft_object[(a.shape, a.dtype, axis)](a.copy(), b)
+    return b
 
-def irfft2(a, axes=None):
+def irfft2(a, b, axes=None, overwrite_input=False, threads=1):
     global irfft2_object
-    if not a.shape in irfft2_object:
-        b = a.copy()
-        irfft2_object[(a.shape, a.dtype)] = pyfftw.builders.irfft2(b, axes=axes)
-        
-    in_array = irfft2_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return irfft2_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, axes) in irfft2_object:
+        irfft2_object[(a.shape, a.dtype, axes)] = pyfftw.builders.irfft2(a, axes=axes, threads=threads)
+    # Copy required for irfft2 because input is destroyed
+    if overwrite_input:
+        irfft2_object[(a.shape, a.dtype, axes)](a, b)
+    else:
+        irfft2_object[(a.shape, a.dtype, axes)](a.copy(), b)
+    return b
 
-def irfftn(a, axes=None):
+def irfftn(a, b, axes=None, overwrite_input=False, threads=1):
     global irfftn_object
-    if not a.shape in irfftn_object:
-        b = a.copy()
-        irfftn_object[(a.shape, a.dtype)] = pyfftw.builders.irfftn(b, axes=axes)
-        
-    in_array = irfftn_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return irfftn_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, axes) in irfftn_object:
+        irfftn_object[(a.shape, a.dtype, axes)] = pyfftw.builders.irfftn(a, axes=axes, threads=threads)
+    # Copy required because input is always destroyed
+    if overwrite_input:
+        irfftn_object[(a.shape, a.dtype, axes)](a, b)
+    else:
+        irfftn_object[(a.shape, a.dtype, axes)](a.copy(), b)
+    return b
 
-def fft(a, axis=None):
+def fft(a, b, axis=None, overwrite_input=False threads=1):
     global fft_object
-    if not a.shape in fft_object:
-        b = a.copy()
-        fft_object[(a.shape, a.dtype)] = pyfftw.builders.fft(b, axis=axis)
-    
-    in_array = fft_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return fft_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axis) in fft_object:
+        fft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.fft(a, axis=axis, overwrite_input=overwrite_input, threads=threads)
+    fft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+    return b
 
-def fft2(a, axes=None):
+def fft2(a, b, axes=None, overwrite_input=False, threads=1):
     global fft2_object
-    if not a.shape in fft2_object:
-        b = a.copy()
-        fft2_object[(a.shape, a.dtype)] = pyfftw.builders.fft2(b, axes=axes)
-    
-    in_array = fft2_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return fft2_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axes) in fft2_object:
+        fft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.fft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads)
+    fft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    return b
 
-def fftn(a, axes=None):
+def fftn(a, b, axes=None, threads=1):
     global fftn_object
-    if not a.shape in fftn_object:
-        b = a.copy()
-        fftn_object[(a.shape, a.dtype)] = pyfftw.builders.fftn(b, axes=axes)
-    
-    in_array = fftn_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a
-    return fftn_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axes) in fftn_object:
+        fftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.fftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads)    
+    fftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    return b
 
-def rfft(a, axis=None):
+def rfft(a, b, axis=None, overwrite_input=False, threads=1):
     global rfft_object
-    if not a.shape in rfft_object:
-        b = a.copy()
-        rfft_object[(a.shape, a.dtype)] = pyfftw.builders.rfft(b, axis=axis)
-        
-    in_array = rfft_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a        
-    return rfft_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axis) in rfft_object:
+        rfft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.rfft(a, axis=axis, overwrite_input=overwrite_input, threads=threads)
+    rfft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+    return b
 
-def rfft2(a, axes=None):
+def rfft2(a, b, axes=None, overwrite_input=False, threads=1):
     global rfft2_object
-    if not a.shape in rfft2_object:
-        b = a.copy()
-        rfft2_object[(a.shape, a.dtype)] = pyfftw.builders.rfft2(b, axes=axes)
-        
-    in_array = rfft2_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a        
-    return rfft2_object[(a.shape, a.dtype)]()
+    if not (a.shape, a.dtype, overwrite_input, axes) in rfft2_object:
+        rfft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.rfft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads)  
+    rfft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    return b
 
-def rfftn(a, axes=None):
+def rfftn(a, b, axes=None, overwrite_input=False, threads=1):
     global rfftn_object
-    if not a.shape in rfftn_object:
-        b = a.copy()
-        rfftn_object[(a.shape, a.dtype)] = pyfftw.builders.rfftn(b, axes=axes)
-        
-    in_array = rfftn_object[(a.shape, a.dtype)].get_input_array()
-    in_array[:] = a        
-    return rfftn_object[(a.shape, a.dtype)]()
-
+    if not (a.shape, a.dtype, overwrite_input, axes) in rfftn_object:
+        rfftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.rfftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads)
+    rfftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    return b
 
 if hasattr(pyfftw.builders, "dchijt"):
     def dct(a, type=2, axis=0):
@@ -187,3 +160,71 @@ else:
 
         else:
             return dct1(x, type=type, axis=axis)
+
+
+#def fft(a, b=None, axis=0):
+    #if b is None:
+        #b = nfft.fft(a, axis=axis)
+    #else:
+        #b[:] = nfft.fft(a, axis=axis)
+    #return b
+        
+#def ifft(a, b=None, axis=0):
+    #if b is None:
+        #b = nfft.ifft(a, axis=axis)
+    #else:
+        #b[:] = nfft.ifft(a, axis=axis)
+    #return b
+
+#def rfft(a, b, axis=0, overwrite_input=False, threads=1):
+    #b[:] = nfft.rfft(a, axis=axis, overwrite_input=overwrite_input)
+    #return b
+        
+#def irfft(a, b, axis=0, overwrite_input=False, threads=1):
+    #b[:] = nfft.irfft(a, axis=axis, overwrite_input=overwrite_input)
+    #return b
+
+#def fft2(a, b=None, axes=(0, 1)):
+    #if b is None:
+        #b = nfft.fft2(a, axes=axes)
+    #else:
+        #b[:] = nfft.fft2(a, axes=axes)
+    #return b
+        
+#def ifft2(a, b=None, axes=(0, 1)):
+    #if b is None:
+        #b = nfft.ifft2(a, axes=axes)
+    #else:
+        #b[:] = nfft.ifft2(a, axes=axes)
+    #return b
+
+#def rfft2(a, b, axes=(0, 1), overwrite_input=False, threads=1):
+    #b[:] = nfft.rfft2(a, axes=axes, overwrite_input=overwrite_input)
+    #return b
+        
+#def irfft2(a, b, axes=(0, 1), overwrite_input=False, threads=1):
+    #b[:] = nfft.irfft2(a, axes=axes, overwrite_input=overwrite_input)
+    #return b
+
+#def fftn(a, b=None, axes=(0, 1, 2)):
+    #if b is None:
+        #b = nfft.fftn(a, axes=axes)
+    #else:
+        #b[:] = nfft.fftn(a, axes=axes)
+    #return b
+        
+#def ifftn(a, b=None, axes=(0, 1, 2)):
+    #if b is None:
+        #b = nfft.ifftn(a, axes=axes)
+    #else:
+        #b[:] = nfft.ifftn(a, axes=axes)
+    #return b
+
+#def rfftn(a, b, axes=(0, 1, 2), overwrite_input=False, threads=1):
+    #b[:] = nfft.rfftn(a, axes=axes, overwrite_input=overwrite_input)
+    #return b
+        
+#def irfftn(a, b, axes=(0, 1, 2), overwrite_input=False, threads=1):
+    #b[:] = nfft.irfftn(a, axes=axes, overwrite_input=overwrite_input)
+    #return b
+ 

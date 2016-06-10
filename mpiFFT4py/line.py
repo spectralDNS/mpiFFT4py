@@ -47,7 +47,7 @@ class FastFourierTransform(object):
         
     """
     
-    def __init__(self, N, L, MPI, precision, padsize=1.5):
+    def __init__(self, N, L, MPI, precision, padsize=1.5, threads=1):
         self.N = N         # The global size of the problem
         self.L = L
         assert len(L) == 2
@@ -58,6 +58,7 @@ class FastFourierTransform(object):
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()
         self.padsize = padsize
+        self.threads = threads
         # Each cpu gets ownership of Np indices
         self.Np = N / self.num_processes
         self.Nf = N[1]/2+1
@@ -172,11 +173,11 @@ class FastFourierTransform(object):
         
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
-                fu[:] = rfft2(u, axes=(0,1))
+                fu = rfft2(u, fu, axes=(0,1), threads=self.threads)
                 
             else:
                 fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
-                fu_padded[:] = rfft2(u/self.padsize**2, axes=(0,1))                
+                fu_padded = rfft2(u/self.padsize**2, fu_padded, axes=(0,1), threads=self.threads)                
                 fu[:] = fu_padded[self.ks, :self.Nf]
                 
             return fu    
@@ -187,12 +188,13 @@ class FastFourierTransform(object):
             Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
             U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
             U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
+            Uc = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
             fft_y = self.work_arrays[((self.N[0],), self.complex, 0)]
             fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
             plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
             
             # Transform in y-direction
-            Uc_hatT[:] = rfft(u, axis=1)
+            Uc_hatT = rfft(u, Uc_hatT, axis=1, threads=self.threads)
             Uc_hatT[:, 0] += 1j*Uc_hatT[:, -1]
             
             U_send = transpose_x(U_send, Uc_hatT, self.num_processes)
@@ -200,7 +202,8 @@ class FastFourierTransform(object):
             # Communicate all values
             self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
             
-            fu[:, :self.Np[1]/2] = fft(U_sendr, axis=0)
+            Uc = fft(U_sendr, Uc, axis=0, threads=self.threads)
+            fu[:, :self.Np[1]/2] = Uc
             
             # Handle Nyquist frequency
             if self.rank == 0:        
@@ -222,7 +225,7 @@ class FastFourierTransform(object):
             plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
                     
             # Transform in y-direction
-            fu_padded_xy[:] = rfft(u/self.padsize, axis=1)
+            fu_padded_xy = rfft(u/self.padsize, fu_padded_xy, axis=1, threads=self.threads)
             fu_padded_xy2 = self.copy_from_padded_y(fu_padded_xy, fu_padded_xy2)
             fu_padded_xy2[:, 0] += 1j*fu_padded_xy2[:, -1]
             
@@ -231,7 +234,7 @@ class FastFourierTransform(object):
             # Communicate all values
             self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
             
-            U_sendr[:] = fft(U_sendr/self.padsize, axis=0)
+            U_sendr = fft(U_sendr/self.padsize, U_sendr, axis=0, threads=self.threads)
             
             fu[:, :self.Np[1]/2] = U_sendr[self.ks]
             
@@ -256,13 +259,13 @@ class FastFourierTransform(object):
             fu *= self.dealias
             
         if self.num_processes == 1:
-            if not dealias == '3/2-rule':                
-                u[:] = irfft2(fu, axes=(0,1))
+            if not dealias == '3/2-rule': 
+                u = irfft2(fu, u, axes=(0,1), threads=self.threads)
             
             else:
                 fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
                 fu_padded[self.ks, :self.Nf] = fu[:]
-                u[:] = irfft2(fu_padded*self.padsize**2, axes=(0,1))
+                u = irfft2(fu_padded*self.padsize**2, u, axes=(0,1), threads=self.threads)
                 
             return u
 
@@ -276,7 +279,7 @@ class FastFourierTransform(object):
             fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
             plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
 
-            Uc_hat[:] = ifft(fu, axis=0)    
+            Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads)    
             U_sendr[:] = Uc_hat[:, :self.Np[1]/2]
 
             self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
@@ -289,20 +292,21 @@ class FastFourierTransform(object):
             self.comm.Scatter(fft_y, plane_recv, root=self.num_processes-1)
             Uc_hatT[:, -1] = plane_recv
             
-            u[:] = irfft(Uc_hatT, axis=1)
+            u = irfft(Uc_hatT, u, axis=1, threads=self.threads)
             
         else:
             U_send  = self.work_arrays[((self.num_processes, int(self.padsize*self.Np[0]), self.Np[1]/2), complex, 0)]
             U_sendr = U_send.reshape((int(self.padsize*self.N[0]), self.Np[1]/2))
             Uc_hatT = self.work_arrays[((int(self.padsize*self.Np[0]), self.Nf), complex, 0)]            
             fu_padded_x = self.work_arrays[(self.complex_padded_x(), self.complex, 0)] 
+            fu_padded_x2= self.work_arrays[(self.complex_padded_x(), self.complex, 1)] 
             fu_padded_xy = self.work_arrays[(self.complex_padded_xy(), self.complex, 0)]
             fft_y = self.work_arrays[((int(self.padsize*self.N[0]),), self.complex, 0)]
             fft_x = self.work_arrays[((int(self.padsize*self.N[0]),), self.complex, 1)]
             plane_recv = self.work_arrays[((int(self.padsize*self.Np[0]),), self.complex, 2)]
             
-            fu_padded_x = self.copy_to_padded_x(fu, fu_padded_x)
-            fu_padded_x[:] = ifft(fu_padded_x, axis=0)
+            fu_padded_x2 = self.copy_to_padded_x(fu, fu_padded_x)
+            fu_padded_x = ifft(fu_padded_x2, fu_padded_x, axis=0, threads=self.threads)
             
             U_sendr[:] = fu_padded_x[:, :self.Np[1]/2]
 
@@ -318,6 +322,6 @@ class FastFourierTransform(object):
             
             fu_padded_xy = self.copy_to_padded_y(Uc_hatT, fu_padded_xy)
             
-            u[:] = irfft(fu_padded_xy, axis=1)*self.padsize**2
+            u = irfft(fu_padded_xy*self.padsize**2, u, axis=1, threads=self.threads)
             
         return u

@@ -27,28 +27,32 @@ class work_arrays(collections.MutableMapping):
     The dictionary allows two types of keys for the same item.    
     
     keys:
-        - (shape, dtype, index), where shape is tuple, dtype is np.dtype and 
-                                 index an integer
-        - (ndarray, index),      where ndarray is a numpy array and index is
-                                 an integer
-                                 
+        - (shape, dtype, index (, fillzero)), where shape is tuple, dtype is np.dtype and 
+                                              index an integer
+        - (ndarray, index (, fillzero)),      where ndarray is a numpy array and index is
+                                              an integer
+                                              fillzero is an optional bool that determines
+                                              whether the array is initialised to zero
+                                              
     Usage:
         To create two real work arrays of shape (3,3), do:
         - work = workarrays()
         - a = work[((3,3), np.float, 0)]
         - b = work[(a, 1)]
-        
-    Returns:
-        Numpy array of given shape initialised to zero
 
+    Returns:
+        Numpy array of given shape. The array is by default initialised to zero, but this
+        can be overridden using the fillzero argument.
+        
     """
 
     def __init__(self):
         self.store = work_array_dict()
+        self.fillzero = True
     
     def __getitem__(self, key):
         val = self.store[self.__keytransform__(key)]
-        val.fill(0)
+        if self.fillzero is True: val.fill(0)
         return val
 
     def __setitem__(self, key, value):
@@ -68,20 +72,33 @@ class work_arrays(collections.MutableMapping):
 
     def __keytransform__(self, key):
         if isinstance(key[0], np.ndarray):
-            assert len(key) == 2
-            shape = key[0].shape
-            dtype = key[0].dtype
-            i = key[1]
+            if len(key) == 2:
+                shape = key[0].shape
+                dtype = key[0].dtype
+                i = key[1]
+                zero = True
+                
+            elif len(key) == 3:
+                shape = key[0].shape
+                dtype = key[0].dtype
+                i = key[1]
+                zero = key[2]
             
         elif isinstance(key[0], tuple):
-            assert len(key) == 3
-            shape, dtype, i = key
+            if len(key) == 3:
+                shape, dtype, i = key
+                zero = True
+                
+            elif len(key) == 4:
+                shape, dtype, i, zero = key
             
         else:
             raise TypeError("Wrong type of key for work array")
         
+        assert isinstance(zero, bool)
+        assert isinstance(i, int)
+        self.fillzero = zero
         return (shape, np.dtype(dtype), i)
-
 
 def datatypes(precision):
     """Return datatypes associated with precision."""

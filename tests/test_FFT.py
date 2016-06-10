@@ -2,7 +2,7 @@ import pytest
 import string
 import numpy as np
 from numpy.random import random, randn
-from numpy import allclose, zeros, zeros_like, pi, array, int, all, float64
+from numpy import allclose, empty, zeros, zeros_like, pi, array, int, all, float64
 from numpy.fft import fftfreq
 from mpi4py import MPI
 
@@ -44,13 +44,14 @@ def FFT_c2c(request):
 def test_FFT(FFT):
     if FFT.rank == 0:
         A = random((N, N, N)).astype(FFT.float)
-        if hasattr(FFT, 'pencilparams'):
-            if FFT.pencilparams['method'] == 'Nyquist':
-                C = rfftn(A, axes=(0,1,2))
+        if hasattr(FFT, 'method'):
+            if FFT.method == 'Nyquist':
+                C = empty(FFT.global_complex_shape(), dtype=FFT.complex)
+                C = rfftn(A, C, axes=(0,1,2))
                 C[:, :, -1] = 0  # Remove Nyquist frequency
-                A[:] = irfftn(C, axes=(0,1,2))
+                A = irfftn(C, A, axes=(0,1,2))
         B2 = zeros((N, N, N/2+1), dtype=FFT.complex)
-        B2[:] = rfftn(A, axes=(0,1,2))
+        B2 = rfftn(A, B2, axes=(0,1,2))
 
     else:
         A = zeros((N, N, N), dtype=FFT.float)
@@ -83,7 +84,8 @@ def test_FFT2(FFT2):
     c = zeros(FFT2.complex_shape(), dtype=FFT2.complex)
     a[:] = A[FFT2.real_local_slice()]
     c = FFT2.fft2(a, c)
-    B2 = rfft2(A, axes=(0,1))
+    B2 = zeros(FFT2.global_complex_shape(), dtype=FFT2.complex)
+    B2 = rfft2(A, B2, axes=(0,1))
     assert allclose(c, B2[FFT2.complex_local_slice()], rtol, atol)
     a = FFT2.ifft2(c, a)
     assert allclose(a, A[FFT2.real_local_slice()], rtol, atol)
@@ -94,11 +96,11 @@ def test_FFT2_padded(FFT2):
     if FFT.rank == 0:
         A = random(N).astype(FFT.float)
         C = zeros((FFT.global_complex_shape()), dtype=FFT.complex)
-        C[:] = rfft2(A, axes=(0,1))
+        C = rfft2(A, C, axes=(0,1))
         
         # Eliminate Nyquist, otherwise test will fail
         C[-N[0]/2] = 0
-        A[:] = irfft2(C)
+        A = irfft2(C, A)
         
         Cp = zeros((3*N[0]/2, 3*N[1]/4+1), dtype=FFT.complex)
         Nf = N[1]/2+1
@@ -106,7 +108,7 @@ def test_FFT2_padded(FFT2):
         Cp[ks, :Nf] = C[:]
                 
         Ap = zeros((3*N[0]/2, 3*N[1]/2), dtype=FFT.float)
-        Ap[:] = irfft2(Cp, axes=(0,1))*1.5**2
+        Ap = irfft2(Cp*1.5**2, Ap, axes=(0,1))
         
     else:
         C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
@@ -144,16 +146,16 @@ def test_FFT_padded(FFT):
     if FFT.rank == 0:
         A = random(N).astype(FFT.float)
         C = zeros((FFT.global_complex_shape()), dtype=FFT.complex)
-        C[:] = rfftn(A, axes=(0,1,2))
+        C = rfftn(A, C, axes=(0,1,2))
         
         # Eliminate Nyquist, otherwise test will fail
         C[-N[0]/2] = 0
         C[:, -N[1]/2] = 0
-        if hasattr(FFT, 'pencilparams'):
-            if FFT.pencilparams['method'] == 'Nyquist':
+        if hasattr(FFT, 'method'):
+            if FFT.method == 'Nyquist':
                 C[:, :, -1] = 0  # Remove Nyquist frequency
         
-        A[:] = irfftn(C)
+        A = irfftn(C, A)
         
         Cp = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/4+1), dtype=FFT.complex)
         Nf = N[2]/2+1
@@ -168,7 +170,7 @@ def test_FFT_padded(FFT):
         Cp[:, N[1]/2] = Cp[:, -N[1]/2]
         
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.float)
-        Ap[:] = irfftn(Cp, axes=(0,1,2))*1.5**3
+        Ap = irfftn(Cp*1.5**3, Ap, axes=(0,1,2))
         
     else:
         C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
@@ -191,7 +193,6 @@ def test_FFT_padded(FFT):
     
     atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
     
-    #print np.linalg.norm(ap-ae)
     assert allclose(ap, ae, rtol, atol)
     
     cp = FFT.fftn(ap, cp, dealias="3/2-rule")    
@@ -216,7 +217,7 @@ def test_FFT_c2c(FFT_c2c):
         # Create a reference solution using only one CPU 
         A = (random(N)+random(N)*1j).astype(FFT.complex)
         C = zeros((FFT.global_shape()), dtype=FFT.complex)
-        C[:] = fftn(A, axes=(0,1,2))
+        C = fftn(A, C, axes=(0,1,2))
         
         # Copy to array padded with zeros
         Cp = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.complex)
@@ -228,7 +229,7 @@ def test_FFT_c2c(FFT_c2c):
         
         # Get transform of padded array
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.complex)
-        Ap[:] = ifftn(Cp*1.5**3, axes=(0,1,2))
+        Ap = ifftn(Cp*1.5**3, Ap, axes=(0,1,2))
         
     else:
         C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
@@ -282,10 +283,10 @@ def test_FFT_c2c(FFT_c2c):
     #print "Y: ", ty
     #print "X: ", tx
 
-#test_FFT(slab_FFT(array([N, N, N]), L, MPI, "single"))
-#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", method='Swap'))
-#test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "double"))
-#test_FFT2_padded(line_FFT(array([N, N]), L[:-1], MPI, "double"))
-#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "single"))
+#test_FFT(slab_FFT(array([N, N, N]), L, MPI, "double"))
+#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", method='Nyquist'))
+#test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
+#test_FFT2_padded(line_FFT(array([N, N]), L[:-1], MPI, "single"))
+test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double"))
 #test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="X", method='Swap'))
 #test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "double"))
