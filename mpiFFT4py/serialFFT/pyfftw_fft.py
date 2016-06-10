@@ -84,7 +84,7 @@ def irfftn(a, b, axes=None, overwrite_input=False, threads=1):
         irfftn_object[(a.shape, a.dtype, axes)](a.copy(), b)
     return b
 
-def fft(a, b, axis=None, overwrite_input=False threads=1):
+def fft(a, b, axis=None, overwrite_input=False, threads=1):
     global fft_object
     if not (a.shape, a.dtype, overwrite_input, axis) in fft_object:
         fft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.fft(a, axis=axis, overwrite_input=overwrite_input, threads=threads)
