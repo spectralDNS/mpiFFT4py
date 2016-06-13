@@ -1,4 +1,5 @@
 try:
+    #assert False
     from pyfftw_fft import *
    
 except:

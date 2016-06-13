@@ -241,10 +241,9 @@ class FastFourierTransformY(object):
             if dealias == '2/3-rule':
                 fu *= self.dealias
             
-            Uc_hat_y  = self.work_arrays[((N2[0], N[1], N1f), self.complex, 0)]
-            Uc_hat_z  = self.work_arrays[((N1[0], N2[1], Nf), self.complex, 0)]
-            Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0)]
-            Uc_hat_xc = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 1)]
+            Uc_hat_y  = self.work_arrays[((N2[0], N[1], N1f), self.complex, 0, False)]
+            Uc_hat_z  = self.work_arrays[((N1[0], N2[1], Nf), self.complex, 0, False)]
+            Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0, False)]
             
             if self.method == 'Nyquist':
                 
@@ -256,41 +255,40 @@ class FastFourierTransformY(object):
                     
                 # Communicate in xz-plane and do fft in x-direction
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
-                Uc_hat_xc = ifft(Uc_hat_x, Uc_hat_xc, axis=0, threads=self.threads)
+                Uc_hat_x[:] = ifft(Uc_hat_x, axis=0, threads=self.threads)
                     
                 # Communicate and transform in xy-plane
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_xc, self.mpitype])
-                Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_xc, self.P1)
+                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_x, self.P1)
                         
                 # Do fft for z-direction
                 Uc_hat_z[:, :, -1] = 0
-                u = irfft(Uc_hat_z, u, axis=2, threads=self.threads)
+                u[:] = irfft(Uc_hat_z, overwrite_input=True, axis=2, threads=self.threads)
             
             elif self.method == 'Swap':
                 
                 # Additional work arrays
-                Uc_hat_xp = self.work_arrays[((N[0], N2[1], N1f), self.complex, 0)]
-                Uc_hat_xp2= self.work_arrays[((N[0], N2[1], N1f), self.complex, 1)]
-                xy_plane  = self.work_arrays[((N[0], N2[1]), self.complex, 0)]
-                xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0)]
+                Uc_hat_xp = self.work_arrays[((N[0], N2[1], N1f), self.complex, 0, False)]
+                xy_plane  = self.work_arrays[((N[0], N2[1]), self.complex, 0, False)]
+                xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0, False)]
                 
                 # Do first owned direction
                 Uc_hat_y = ifft(fu, Uc_hat_y, axis=1, threads=self.threads)
 
                 # Transform to x
-                Uc_hat_xp[:] = transform_Uc_xy(Uc_hat_xp, Uc_hat_y, self.P2)
+                Uc_hat_xp = transform_Uc_xy(Uc_hat_xp, Uc_hat_y, self.P2)
                     
                 # Communicate in xz-plane and do fft in x-direction
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_xp, self.mpitype])
-                Uc_hat_xp2 = ifft(Uc_hat_xp, Uc_hat_xp2, axis=0, threads=self.threads)
+                Uc_hat_xp[:] = ifft(Uc_hat_xp, axis=0, threads=self.threads)
                 
-                Uc_hat_x[:] = Uc_hat_xp2[:, :, :self.N1[2]/2]
+                Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]/2]
                 
                 # Communicate and transform in xy-plane all but k=N/2
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_x, self.P1)
                 
-                xy_plane[:] = Uc_hat_xp2[:, :, -1]
+                xy_plane[:] = Uc_hat_xp[:, :, -1]
                 self.comm0.Scatter(xy_plane, xy_recv, root=self.P1-1)
                 Uc_hat_z[:, :, -1] = xy_recv
                 
