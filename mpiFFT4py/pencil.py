@@ -541,8 +541,6 @@ class FastFourierTransformY(object):
 
             return fu
 
-import mpiFFT4py.serialFFT.pyfftw_fft as pft
-
 class FastFourierTransformX(FastFourierTransformY):
     """Class for performing FFT in 3D using MPI
     
