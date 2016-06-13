@@ -13,13 +13,15 @@ import numpy.fft
 from scipy.fftpack import dct
 
 dct1 = dct
-def dct(x, type=2, axis=0):
-    if iscomplexobj(x):
-        xreal = dct1(x.real, type=type, axis=axis)
-        ximag = dct1(x.imag, type=type, axis=axis)
-        return xreal + ximag*1j
+def dct(a, b, type=2, axis=0, **kw):
+    if iscomplexobj(a):
+        b.real[:] = dct1(a.real, type=type, axis=axis)
+        b.imag[:] = dct1(a.imag, type=type, axis=axis)
+        return b
+
     else:
-        return dct1(x, type=type, axis=axis)
+        b[:] = dct1(a, type=type, axis=axis)
+        return b
 
 # Define functions taking both input array and output array
 

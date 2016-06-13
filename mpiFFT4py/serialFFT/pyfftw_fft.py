@@ -241,7 +241,6 @@ if hasattr(pyfftw.builders, "dct"):
     
 else:
     dct1 = pyfftw.interfaces.scipy_fftpack.dct
-    pyfftw.interfaces.cache.enable()
     #@profile
     def dct(a, b, type=2, axis=0, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
         if iscomplexobj(a):
