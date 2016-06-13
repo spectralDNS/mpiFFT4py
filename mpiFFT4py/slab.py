@@ -208,10 +208,10 @@ class FastFourierTransform(object):
             assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"            
             
             # Intermediate work arrays required for transform
-            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
+            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
             Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0, False)]
-            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0, False)]
-            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
+            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0)]
+            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
             
             # Expand in x-direction and perform ifft
             Upad_hat = self.copy_to_padded_x(fu, Upad_hat)
