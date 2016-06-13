@@ -124,7 +124,6 @@ class FastFourierTransform(object):
         dealias = np.array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                            (abs(K[2]) < kmax[2]), dtype=np.uint8)
         return dealias
-
     #@profile
     def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
@@ -164,7 +163,7 @@ class FastFourierTransform(object):
                 assert u.shape == self.real_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
+                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0, False)]
                 fu_padded[:self.N[0]/2, self.ks, :self.Nf] = fu[:self.N[0]/2]
                 fu_padded[-self.N[0]/2:, self.ks, :self.Nf] = fu[self.N[0]/2:]
                 
@@ -175,14 +174,14 @@ class FastFourierTransform(object):
                 #fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
                 #fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[1]/2]
                 
-                u = irfftn(fu_padded*self.padsize**3, u, axes=(0,1,2), threads=self.threads)
+                u[:] = irfftn(fu_padded*self.padsize**3, overwrite_input=True, axes=(0,1,2), threads=self.threads)
             return u
         
         if not dealias == '3/2-rule':
             # Intermediate work arrays required for transform
-            Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
+            Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
             #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
-            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
             
             # Do first owned direction
             Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads)
@@ -202,22 +201,20 @@ class FastFourierTransform(object):
                     Uc_hatT[:, i*self.Np[1]:(i+1)*self.Np[1]] = Uc_send[i]
                 
             # Do last two directions
-            u = irfft2(Uc_hatT, u, axes=(1,2), threads=self.threads)
+            u[:] = irfft2(Uc_hatT, overwrite_input=True, axes=(1,2), threads=self.threads)
 
         else:
             assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"            
             
             # Intermediate work arrays required for transform
-            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
-            Upad_hatc = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1)]
-            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
-            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0)]
-            Upad_hat2c= self.work_arrays[(self.complex_shape_padded_2(), self.complex, 1)]
-            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
+            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
+            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0, False)]
+            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0, False)]
+            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
             
             # Expand in x-direction and perform ifft
-            Upad_hatc = self.copy_to_padded_x(fu, Upad_hatc)
-            Upad_hat = ifft(Upad_hatc, Upad_hat, axis=0, threads=self.threads)
+            Upad_hat = self.copy_to_padded_x(fu, Upad_hat)
+            Upad_hat[:] = ifft(Upad_hat, axis=0, threads=self.threads)
             
             # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir)
             self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat, self.mpitype])
@@ -225,15 +222,16 @@ class FastFourierTransform(object):
             
             # Transpose data and pad in y-direction before doing ifft. Now data is padded in x and y 
             Upad_hat1[:] = np.rollaxis(U_mpi, 1).reshape(Upad_hat1.shape)
-            Upad_hat2c = self.copy_to_padded_y(Upad_hat1, Upad_hat2c)
-            Upad_hat2 = ifft(Upad_hat2c, Upad_hat2, axis=1, threads=self.threads)
+            Upad_hat2 = self.copy_to_padded_y(Upad_hat1, Upad_hat2)
+            Upad_hat2[:] = ifft(Upad_hat2, axis=1, threads=self.threads)
             
             # pad in z-direction and perform final irfft
             Upad_hat3 = self.copy_to_padded_z(Upad_hat2, Upad_hat3)
-            u = irfft(Upad_hat3*self.padsize**3, u, axis=2, threads=self.threads)
+            u[:] = irfft(Upad_hat3*self.padsize**3, overwrite_input=True, axis=2, threads=self.threads)
             
         return u
 
+    #@profile
     def fftn(self, u, fu, dealias=None):
         """fft in three directions using mpi
         
@@ -265,8 +263,8 @@ class FastFourierTransform(object):
             else:
                 assert u.shape == self.real_shape_padded()
                 
-                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
-                fu_padded = rfftn(u/self.padsize**3, fu_padded, axes=(0,1,2))
+                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0, False)]
+                fu_padded[:] = rfftn(u/self.padsize**3, overwrite_input=True, axes=(0,1,2))
                 
                 # Copy with truncation
                 fu[:self.N[0]/2] = fu_padded[:self.N[0]/2, self.ks, :self.Nf] 
@@ -281,7 +279,7 @@ class FastFourierTransform(object):
         if not dealias == '3/2-rule':
             if self.communication == 'alltoall':     
                 # Intermediate work arrays required for transform
-                Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+                Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
                 
                 # Do 2 ffts in y-z directions on owned data
                 Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads)
@@ -303,18 +301,18 @@ class FastFourierTransform(object):
                 fu_send[:] = fu_send.transpose(0,2,1,3)
                             
             # Do fft for last direction 
-            fu = fft(fu*1, fu, axis=0, threads=self.threads)
+            fu[:] = fft(fu, axis=0, threads=self.threads)
         
         else:
             assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"
             assert u.shape == self.real_shape_padded()
             
             # Intermediate work arrays required for transform
-            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
-            Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1)]
-            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
-            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0)]
-            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
+            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
+            Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1, False)]
+            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0, False)]
+            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0, False)]
+            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
             
             # Do ffts in the padded y and z directions
             Upad_hat3 = rfft2(u/self.padsize**2, Upad_hat3, axes=(1,2), threads=self.threads)        
@@ -327,7 +325,7 @@ class FastFourierTransform(object):
             self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat0, self.mpitype])
             
             # Perform fft of data in x-direction
-            Upad_hat = fft(Upad_hat0/self.padsize, Upad_hat, axis=0, threads=self.threads)
+            Upad_hat[:] = fft(Upad_hat0/self.padsize, overwrite_input=True, axis=0, threads=self.threads)
             
             # Truncate to original complex shape
             fu[:self.N[0]/2] = Upad_hat[:self.N[0]/2]
@@ -445,12 +443,12 @@ class c2c(FastFourierTransform):
                 assert u.shape == self.original_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = self.work_arrays[(u, 0)]
+                fu_padded = self.work_arrays[(u, 0, False)]
                 fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks] = fu[:self.N[0]/2, :self.N[1]/2]
                 fu_padded[:self.N[0]/2, -self.N[1]/2:, self.ks] = fu[:self.N[0]/2, self.N[1]/2:]
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, self.ks] = fu[self.N[0]/2:, :self.N[1]/2]
                 fu_padded[-self.N[0]/2:, -self.N[1]/2:, self.ks] = fu[self.N[0]/2:, self.N[1]/2:]                                
-                u[:] = ifftn(fu_padded*self.padsize**3, axes=(0,1,2), threads=self.threads)
+                u[:] = ifftn(fu_padded*self.padsize**3, overwrite_input=True, axes=(0,1,2), threads=self.threads)
                 
             return u
         
@@ -459,9 +457,9 @@ class c2c(FastFourierTransform):
                 fu *= self.dealias
             
             # Intermediate work arrays required for transform
-            Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0)]
-            Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
-            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+            Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
+            Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
+            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
 
             # Do first owned direction
             Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads)
@@ -479,19 +477,19 @@ class c2c(FastFourierTransform):
                     Uc_hatT[:, i*self.Np[1]:(i+1)*self.Np[1]] = Uc_send[i]
                 
             # Do last two directions
-            u = ifft2(Uc_hatT, u, axes=(1,2), threads=self.threads)
+            u[:] = ifft2(Uc_hatT, overwrite_input=True, axes=(1,2), threads=self.threads)
 
         else:
             # Intermediate work arrays required for transform
-            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
-            U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0)]
-            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
-            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0)]
-            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
+            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
+            U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0, False)]
+            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0, False)]
+            Upad_hat2 = self.work_arrays[(self.complex_shape_padded_2(), self.complex, 0, False)]
+            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
 
             # Expand in x-direction and perform ifft
             Upad_hat = self.copy_to_padded_x(fu, Upad_hat)
-            Upad_hat = ifft(Upad_hat*self.padsize, Upad_hat, axis=0)  
+            Upad_hat[:] = ifft(Upad_hat*self.padsize, overwrite_input=True, axis=0)  
             
             # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir and z-direction of full size)            
             self.comm.Alltoall([Upad_hat, self.mpitype], [U_mpi, self.mpitype])
@@ -499,11 +497,11 @@ class c2c(FastFourierTransform):
             # Transpose data and pad in y-direction before doing ifft. Now data is padded in x and y 
             Upad_hat1[:] = np.rollaxis(U_mpi, 1).reshape(Upad_hat1.shape)
             Upad_hat2 = self.copy_to_padded_y(Upad_hat1, Upad_hat2)
-            Upad_hat2 = ifft(Upad_hat2*self.padsize, Upad_hat2, axis=1)
+            Upad_hat2[:] = ifft(Upad_hat2*self.padsize, overwrite_input=True, axis=1)
             
             # pad in z-direction and perform final ifft
             Upad_hat3 = self.copy_to_padded_z(Upad_hat2, Upad_hat3)
-            u = ifft(Upad_hat3*self.padsize, u, axis=2, threads=self.threads)
+            u[:] = ifft(Upad_hat3*self.padsize, overwrite_input=True, axis=2, threads=self.threads)
             
         return u
 
@@ -538,8 +536,8 @@ class c2c(FastFourierTransform):
             else:
                 assert u.shape == self.original_shape_padded()
                 
-                fu_padded = self.work_arrays[(u, 0)]
-                fu_padded = fftn(u/self.padsize**3, fu_padded, axes=(0,1,2), threads=self.threads)
+                fu_padded = self.work_arrays[(u, 0, False)]
+                fu_padded[:] = fftn(u/self.padsize**3, overwrite_input=True, axes=(0,1,2), threads=self.threads)
                 
                 # Copy with truncation
                 fu[:self.N[0]/2, :self.N[1]/2] = fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks]
@@ -552,9 +550,8 @@ class c2c(FastFourierTransform):
         if not dealias == '3/2-rule':
             if self.communication == 'alltoall':
                 # Intermediate work arrays required for transform
-                Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
-                Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
-                fu2 = self.work_arrays[(fu, 0, False)]
+                Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
+                Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
 
                 # Do 2 ffts in y-z directions on owned data
                 Uc_hatT = fft2(u, Uc_hatT, axes=(1,2), threads=self.threads)
@@ -563,7 +560,7 @@ class c2c(FastFourierTransform):
                 Uc_mpi[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
                     
                 # Communicate all values
-                self.comm.Alltoall([Uc_mpi, self.mpitype], [fu2, self.mpitype])  
+                self.comm.Alltoall([Uc_mpi, self.mpitype], [fu, self.mpitype])  
             
             else:
                 # Communicating intermediate result 
@@ -576,18 +573,18 @@ class c2c(FastFourierTransform):
                 fu_send[:] = fu_send.transpose(0,2,1,3)
                             
             # Do fft for last direction 
-            fu = fft(fu2, fu, axis=0, threads=self.threads)
+            fu[:] = fft(fu, axis=0, threads=self.threads)
         
         else:
             # Intermediate work arrays required for transform
-            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
-            Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1)]
-            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
-            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
-            U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0)]
+            Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
+            Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1, False)]
+            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0, False)]
+            Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
+            U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0, False)]
 
             # Do ffts in y and z directions
-            Upad_hat3 = fft2(u/self.padsize**2, Upad_hat3, axes=(1,2), threads=self.threads)   
+            Upad_hat3[:] = fft2(u/self.padsize**2, overwrite_input=True, axes=(1,2), threads=self.threads)   
             
             # Copy with truncation 
             Upad_hat1 = self.copy_from_padded(Upad_hat3, Upad_hat1)
@@ -597,7 +594,7 @@ class c2c(FastFourierTransform):
             self.comm.Alltoall([U_mpi, self.mpitype], [Upad_hat0, self.mpitype])
             
             # Perform fft of data in x-direction
-            Upad_hat = fft(Upad_hat0/self.padsize, Upad_hat, axis=0, threads=self.threads)
+            Upad_hat[:] = fft(Upad_hat0/self.padsize, overwrite_input=True, axis=0, threads=self.threads)
             
             # Truncate to original complex shape
             fu[:self.N[0]/2] = Upad_hat[:self.N[0]/2]

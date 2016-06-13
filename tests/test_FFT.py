@@ -57,7 +57,7 @@ def test_FFT(FFT):
         A = zeros((N, N, N), dtype=FFT.float)
         B2 = zeros((N, N, N/2+1), dtype=FFT.complex)
 
-    atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-5)
+    atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
     FFT.comm.Bcast(A, root=0)
     FFT.comm.Bcast(B2, root=0)
     
