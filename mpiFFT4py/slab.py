@@ -124,6 +124,7 @@ class FastFourierTransform(object):
         dealias = np.array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                            (abs(K[2]) < kmax[2]), dtype=np.uint8)
         return dealias
+    
     #@profile
     def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
@@ -180,21 +181,21 @@ class FastFourierTransform(object):
         if not dealias == '3/2-rule':
             # Intermediate work arrays required for transform
             Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
-            #Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
-            Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
+            Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
             
             # Do first owned direction
             Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads)
                 
             if self.communication == 'alltoall':
                 # Communicate all values
-                #self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
-                #Uc_hatT[:] = np.rollaxis(Uc_mpi, 1).reshape(Uc_hatT.shape)
-                self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
-                Uc_hatT[:] = np.rollaxis(Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf)), 1).reshape(Uc_hatT.shape)
+                self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
+                Uc_hatT = np.rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
+                #self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                #Uc_hatT = np.rollaxis(Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf)), 1).reshape(self.complex_shape_T())
             
             else:
                 Uc_send = Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf))
+                Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
                 for i in xrange(self.num_processes):
                     if not i == self.rank:
                         self.comm.Sendrecv_replace([Uc_send[i], self.mpitype], i, 0, i, 0)   
@@ -285,7 +286,7 @@ class FastFourierTransform(object):
                 Uc_hatT = rfft2(u, Uc_hatT, axes=(1,2), threads=self.threads)
                 
                 # Transform data to align with x-direction  
-                fu[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1).reshape(fu.shape)
+                fu[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1).reshape(self.complex_shape())
                     
                 # Communicate all values
                 self.comm.Alltoall(self.MPI.IN_PLACE, [fu, self.mpitype])  # Note to self. In place is possible, should test for efficiency
