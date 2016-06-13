@@ -185,10 +185,10 @@ class FastFourierTransform(object):
         if not dealias == '3/2-rule':
         
             # Work arrays
-            Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
-            U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
+            Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), self.complex, 0)]
+            U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), self.complex, 0)]
             U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
-            Uc = self.work_arrays[((self.N[0], self.Np[1]/2), complex, 0)]
+            Uc = self.work_arrays[((self.N[0], self.Np[1]/2), self.complex, 0)]
             fft_y = self.work_arrays[((self.N[0],), self.complex, 0)]
             fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
             plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
@@ -216,7 +216,7 @@ class FastFourierTransform(object):
                 
         else:
             # Work arrays
-            U_send  = self.work_arrays[((self.num_processes, int(self.padsize*self.Np[0]), self.Np[1]/2), complex, 0)]
+            U_send  = self.work_arrays[((self.num_processes, int(self.padsize*self.Np[0]), self.Np[1]/2), self.complex, 0)]
             U_sendr = U_send.reshape((int(self.padsize*self.N[0]), self.Np[1]/2))
             fu_padded_xy = self.work_arrays[(self.complex_padded_xy(), self.complex, 0)]
             fu_padded_xy2 = self.work_arrays[(self.complex_shape_padded_01(), self.complex, 0)]
@@ -271,9 +271,9 @@ class FastFourierTransform(object):
 
         if not dealias == '3/2-rule':
             # Get some work arrays            
-            Uc_hat  = self.work_arrays[((self.N[0], self.Npf), complex, 0)]
-            Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), complex, 0)]
-            U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), complex, 0)]
+            Uc_hat  = self.work_arrays[((self.N[0], self.Npf), self.complex, 0)]
+            Uc_hatT = self.work_arrays[((self.Np[0], self.Nf), self.complex, 0)]
+            U_send  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1]/2), self.complex, 0)]
             U_sendr = U_send.reshape((self.N[0], self.Np[1]/2))
             fft_y = self.work_arrays[((self.N[0],), self.complex, 0)]
             fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
@@ -295,9 +295,9 @@ class FastFourierTransform(object):
             u = irfft(Uc_hatT, u, axis=1, threads=self.threads)
             
         else:
-            U_send  = self.work_arrays[((self.num_processes, int(self.padsize*self.Np[0]), self.Np[1]/2), complex, 0)]
+            U_send  = self.work_arrays[((self.num_processes, int(self.padsize*self.Np[0]), self.Np[1]/2), self.complex, 0)]
             U_sendr = U_send.reshape((int(self.padsize*self.N[0]), self.Np[1]/2))
-            Uc_hatT = self.work_arrays[((int(self.padsize*self.Np[0]), self.Nf), complex, 0)]            
+            Uc_hatT = self.work_arrays[((int(self.padsize*self.Np[0]), self.Nf), self.complex, 0)]            
             fu_padded_x = self.work_arrays[(self.complex_padded_x(), self.complex, 0)] 
             fu_padded_x2= self.work_arrays[(self.complex_padded_x(), self.complex, 1)] 
             fu_padded_xy = self.work_arrays[(self.complex_padded_xy(), self.complex, 0)]
@@ -305,7 +305,7 @@ class FastFourierTransform(object):
             fft_x = self.work_arrays[((int(self.padsize*self.N[0]),), self.complex, 1)]
             plane_recv = self.work_arrays[((int(self.padsize*self.Np[0]),), self.complex, 2)]
             
-            fu_padded_x2 = self.copy_to_padded_x(fu, fu_padded_x)
+            fu_padded_x2 = self.copy_to_padded_x(fu, fu_padded_x2)
             fu_padded_x = ifft(fu_padded_x2, fu_padded_x, axis=0, threads=self.threads)
             
             U_sendr[:] = fu_padded_x[:, :self.Np[1]/2]

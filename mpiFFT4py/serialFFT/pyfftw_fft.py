@@ -8,8 +8,9 @@ __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
            'fftfreq', 'rfftfreq', 'empty', 'zeros']
 
 import pyfftw
-from numpy import iscomplexobj, zeros_like, float64, zeros as npzeros
+from numpy import iscomplexobj, zeros_like, float64, ascontiguousarray, zeros as npzeros
 from numpy.fft import fftfreq, rfftfreq
+import copy
 
 def empty(N, dtype=float64, bytes=64):
     return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
@@ -31,135 +32,181 @@ rfft2_object  = {}
 rfft_object   = {}
 rfftn_object  = {}
 
-def ifft(a, b, axis=None, overwrite_input=False, threads=1):
+def ifft(a, b, axis=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global ifft_object
     if not (a.shape, a.dtype, overwrite_input, axis) in ifft_object:
-        ifft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.ifft(a, axis=axis, overwrite_input=overwrite_input, threads=threads) 
-    ifft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+        ifft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.ifft(a, axis=axis, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort) 
+    if b.flags['C_CONTIGUOUS'] is True:
+        ifft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+    else:
+        ifft_object[(a.shape, a.dtype, overwrite_input, axis)](a)
+        b[:] = ifft_object[(a.shape, a.dtype, overwrite_input, axis)].output_array
     return b
 
-def ifft2(a, b=None, axes=None, overwrite_input=False, threads=1):
+def ifft2(a, b=None, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global ifft2_object
     if not (a.shape, a.dtype, overwrite_input, axes) in ifft2_object:
-        ifft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.ifft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads)
-    ifft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+        ifft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.ifft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)
+    if b.flags['C_CONTIGUOUS'] is True:
+        ifft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    else:
+        ifft2_object[(a.shape, a.dtype, overwrite_input, axes)](a)
+        b[:] = ifft2_object[(a.shape, a.dtype, overwrite_input, axes)].output_array
     return b
 
-def ifftn(a, b=None, axes=None, overwrite_input=False, threads=1):
+def ifftn(a, b=None, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global ifftn_object
     if not (a.shape, a.dtype, overwrite_input, axes) in ifftn_object:
-        ifftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.ifftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads)            
-    ifftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+        ifftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.ifftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)      
+    if b.flags['C_CONTIGUOUS'] is True:
+        ifftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    else:
+        ifftn_object[(a.shape, a.dtype, overwrite_input, axes)](a)
+        b[:] = ifftn_object[(a.shape, a.dtype, overwrite_input, axes)].output_array
     return b
 
-def irfft(a, b, axis=None, overwrite_input=False, threads=1):
+def irfft(a, b, axis=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global irfft_object
     if not (a.shape, a.dtype, axis) in irfft_object:
-        irfft_object[(a.shape, a.dtype, axis)] = pyfftw.builders.irfft(a, axis=axis, threads=threads)
+        irfft_object[(a.shape, a.dtype, axis)] = pyfftw.builders.irfft(a, axis=axis, threads=threads, planner_effort=planner_effort)
     if overwrite_input:
-        irfft_object[(a.shape, a.dtype, axis)](a, b)
+        irfft_object[(a.shape, a.dtype, axis)](a)
     else:
-        irfft_object[(a.shape, a.dtype, axis)](a.copy(), b)
+        irfft_object[(a.shape, a.dtype, axis)](a.copy())
+    b[:] = irfft_object[(a.shape, a.dtype, axis)].output_array
     return b
 
-def irfft2(a, b, axes=None, overwrite_input=False, threads=1):
+def irfft2(a, b, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global irfft2_object
     if not (a.shape, a.dtype, axes) in irfft2_object:
-        irfft2_object[(a.shape, a.dtype, axes)] = pyfftw.builders.irfft2(a, axes=axes, threads=threads)
+        irfft2_object[(a.shape, a.dtype, axes)] = pyfftw.builders.irfft2(a, axes=axes, threads=threads, planner_effort=planner_effort)
     # Copy required for irfft2 because input is destroyed
     if overwrite_input:
-        irfft2_object[(a.shape, a.dtype, axes)](a, b)
+        irfft2_object[(a.shape, a.dtype, axes)](a)
     else:
-        irfft2_object[(a.shape, a.dtype, axes)](a.copy(), b)
+        irfft2_object[(a.shape, a.dtype, axes)](a.copy())
+    b[:] = irfft2_object[(a.shape, a.dtype, axes)].output_array
     return b
 
-def irfftn(a, b, axes=None, overwrite_input=False, threads=1):
+def irfftn(a, b, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global irfftn_object
     if not (a.shape, a.dtype, axes) in irfftn_object:
-        irfftn_object[(a.shape, a.dtype, axes)] = pyfftw.builders.irfftn(a, axes=axes, threads=threads)
+        irfftn_object[(a.shape, a.dtype, axes)] = pyfftw.builders.irfftn(a, axes=axes, threads=threads, planner_effort=planner_effort)
     # Copy required because input is always destroyed
     if overwrite_input:
-        irfftn_object[(a.shape, a.dtype, axes)](a, b)
+        irfftn_object[(a.shape, a.dtype, axes)](a)
     else:
-        irfftn_object[(a.shape, a.dtype, axes)](a.copy(), b)
+        irfftn_object[(a.shape, a.dtype, axes)](a.copy())
+    b[:] = irfftn_object[(a.shape, a.dtype, axes)].output_array
     return b
 
-def fft(a, b, axis=None, overwrite_input=False, threads=1):
+def fft(a, b, axis=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global fft_object
     if not (a.shape, a.dtype, overwrite_input, axis) in fft_object:
-        fft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.fft(a, axis=axis, overwrite_input=overwrite_input, threads=threads)
-    fft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+        fft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.fft(a, axis=axis, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)
+    if b.flags['C_CONTIGUOUS'] is True:
+        fft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+    else:
+        fft_object[(a.shape, a.dtype, overwrite_input, axis)](a)
+        b[:] = fft_object[(a.shape, a.dtype, overwrite_input, axis)].output_array
     return b
 
-def fft2(a, b, axes=None, overwrite_input=False, threads=1):
+def fft2(a, b, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global fft2_object
     if not (a.shape, a.dtype, overwrite_input, axes) in fft2_object:
-        fft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.fft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads)
-    fft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+        fft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.fft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)
+    if b.flags['C_CONTIGUOUS'] is True:
+        fft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    else:
+        fft2_object[(a.shape, a.dtype, overwrite_input, axes)](a)
+        b[:] = fft2_object[(a.shape, a.dtype, overwrite_input, axes)].output_array
     return b
 
-def fftn(a, b, axes=None, threads=1):
+def fftn(a, b, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global fftn_object
     if not (a.shape, a.dtype, overwrite_input, axes) in fftn_object:
-        fftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.fftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads)    
-    fftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+        fftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.fftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)    
+    if b.flags['C_CONTIGUOUS'] is True:
+        fftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    else:
+        fftn_object[(a.shape, a.dtype, overwrite_input, axes)](a)
+        b[:] = fftn_object[(a.shape, a.dtype, overwrite_input, axes)].output_array
     return b
 
-def rfft(a, b, axis=None, overwrite_input=False, threads=1):
+def rfft(a, b, axis=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global rfft_object
     if not (a.shape, a.dtype, overwrite_input, axis) in rfft_object:
-        rfft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.rfft(a, axis=axis, overwrite_input=overwrite_input, threads=threads)
-    rfft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+        rfft_object[(a.shape, a.dtype, overwrite_input, axis)] = pyfftw.builders.rfft(a, axis=axis, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)
+    if b.flags['C_CONTIGUOUS'] is True:
+        rfft_object[(a.shape, a.dtype, overwrite_input, axis)](a, b)
+    else:
+        rfft_object[(a.shape, a.dtype, overwrite_input, axis)](a)
+        b[:] = rfft_object[(a.shape, a.dtype, overwrite_input, axis)].output_array
     return b
 
-def rfft2(a, b, axes=None, overwrite_input=False, threads=1):
+def rfft2(a, b, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global rfft2_object
     if not (a.shape, a.dtype, overwrite_input, axes) in rfft2_object:
-        rfft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.rfft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads)  
-    rfft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+        rfft2_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.rfft2(a, axes=axes, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)  
+    if b.flags['C_CONTIGUOUS'] is True:
+        rfft2_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    else:
+        rfft2_object[(a.shape, a.dtype, overwrite_input, axes)](a)
+        b[:] = rfft2_object[(a.shape, a.dtype, overwrite_input, axes)].output_array
     return b
 
-def rfftn(a, b, axes=None, overwrite_input=False, threads=1):
+def rfftn(a, b, axes=None, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     global rfftn_object
     if not (a.shape, a.dtype, overwrite_input, axes) in rfftn_object:
-        rfftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.rfftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads)
-    rfftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+        rfftn_object[(a.shape, a.dtype, overwrite_input, axes)] = pyfftw.builders.rfftn(a, axes=axes, overwrite_input=overwrite_input, threads=threads, planner_effort=planner_effort)
+    if b.flags['C_CONTIGUOUS'] is True:
+        rfftn_object[(a.shape, a.dtype, overwrite_input, axes)](a, b)
+    else:
+        rfftn_object[(a.shape, a.dtype, overwrite_input, axes)](a)
+        b[:] = rfftn_object[(a.shape, a.dtype, overwrite_input, axes)].output_array
     return b
 
-if hasattr(pyfftw.builders, "dchijt"):
-    def dct(a, type=2, axis=0):
+if hasattr(pyfftw.builders, "dct"):
+    #@profile
+    def dct(a, b, type=2, axis=0, overwrite_input=False, threads=1, planner_effort="FFTW_EXHAUSTIVE"):
         global dct_object
-        if not (a.shape, type) in dct_object:
+        key = (a.shape, a.dtype, overwrite_input, axis, type)
+        if not key in dct_object:
             if iscomplexobj(a):
-                b = a.real.copy()
+                ac = a.real.copy()
             else:
-                b = a.copy()
-            dct_object[(a.shape, a.dtype, type)] = (pyfftw.builders.dct(b, axis=axis, type=type), a.copy())
+                ac = a
+            dct_object[key] = pyfftw.builders.dct(ac, axis=axis, type=type, 
+                                                  overwrite_input=overwrite_input, 
+                                                  threads=threads,
+                                                  planner_effort=planner_effort)
             
-        dobj, c = dct_object[(a.shape, a.dtype, type)]
-        in_array = dobj.get_input_array()
+        dobj = dct_object[key]
+        c = dobj.get_output_array()
         if iscomplexobj(a):
-            in_array[:] = a.real
-            c.real[:] = dobj()
-            in_array[:] = a.imag
-            c.imag[:] = dobj()            
+            dobj(a.real, c)
+            b.real[:] = c
+            dobj(a.imag, c)
+            b.imag[:] = c
 
         else:
-            in_array[:] = a
-            c[:] = dobj()
-        return c
+            dobj(a)
+            b[:] = c
+        return b
     
 else:
     dct1 = pyfftw.interfaces.scipy_fftpack.dct
-    def dct(x, type=2, axis=0):
-        if iscomplexobj(x):
-            c = zeros_like(x)
-            c.real[:] = dct1(x.real, type=type, axis=axis)
-            c.imag[:] = dct1(x.imag, type=type, axis=axis)
-            return c
+    pyfftw.interfaces.cache.enable()
+    #@profile
+    def dct(a, b, type=2, axis=0, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
+        if iscomplexobj(a):
+            b.real[:] = dct1(a.real, type=type, axis=axis)
+            b.imag[:] = dct1(a.imag, type=type, axis=axis)
+            return b
 
         else:
-            return dct1(x, type=type, axis=axis)
+            b[:] = dct1(a, type=type, axis=axis)
+            return b
 
 
 #def fft(a, b=None, axis=0):
@@ -176,11 +223,11 @@ else:
         #b[:] = nfft.ifft(a, axis=axis)
     #return b
 
-#def rfft(a, b, axis=0, overwrite_input=False, threads=1):
+#def rfft(a, b, axis=0, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     #b[:] = nfft.rfft(a, axis=axis, overwrite_input=overwrite_input)
     #return b
         
-#def irfft(a, b, axis=0, overwrite_input=False, threads=1):
+#def irfft(a, b, axis=0, overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     #b[:] = nfft.irfft(a, axis=axis, overwrite_input=overwrite_input)
     #return b
 
@@ -198,11 +245,11 @@ else:
         #b[:] = nfft.ifft2(a, axes=axes)
     #return b
 
-#def rfft2(a, b, axes=(0, 1), overwrite_input=False, threads=1):
+#def rfft2(a, b, axes=(0, 1), overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     #b[:] = nfft.rfft2(a, axes=axes, overwrite_input=overwrite_input)
     #return b
         
-#def irfft2(a, b, axes=(0, 1), overwrite_input=False, threads=1):
+#def irfft2(a, b, axes=(0, 1), overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     #b[:] = nfft.irfft2(a, axes=axes, overwrite_input=overwrite_input)
     #return b
 
@@ -220,11 +267,11 @@ else:
         #b[:] = nfft.ifftn(a, axes=axes)
     #return b
 
-#def rfftn(a, b, axes=(0, 1, 2), overwrite_input=False, threads=1):
+#def rfftn(a, b, axes=(0, 1, 2), overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     #b[:] = nfft.rfftn(a, axes=axes, overwrite_input=overwrite_input)
     #return b
         
-#def irfftn(a, b, axes=(0, 1, 2), overwrite_input=False, threads=1):
+#def irfftn(a, b, axes=(0, 1, 2), overwrite_input=False, threads=1, planner_effort="FFTW_MEASURE"):
     #b[:] = nfft.irfftn(a, axes=axes, overwrite_input=overwrite_input)
     #return b
  

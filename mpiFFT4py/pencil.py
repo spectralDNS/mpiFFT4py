@@ -541,6 +541,7 @@ class FastFourierTransformY(object):
 
             return fu
 
+import mpiFFT4py.serialFFT.pyfftw_fft as pft
 
 class FastFourierTransformX(FastFourierTransformY):
     """Class for performing FFT in 3D using MPI
@@ -645,7 +646,7 @@ class FastFourierTransformX(FastFourierTransformY):
             if self.method == 'Nyquist':
                 Uc_hat_y2_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 1)]
                 Uc_hat_y2 = Uc_hat_y2_T.transpose((1, 0, 2))
-            
+                
                 # Do first owned direction
                 Uc_hat_x = ifft(fu, Uc_hat_x, axis=0, threads=self.threads)
 
@@ -704,6 +705,7 @@ class FastFourierTransformX(FastFourierTransformY):
             Uc_pad_hat_y = Uc_pad_hat_y_T.transpose((1, 0, 2))
             Uc_pad_hat_xy_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2[2]/2), self.complex, 0)]
             Uc_pad_hat_xy = Uc_pad_hat_xy_T.transpose((1, 0, 2))
+            Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2[2]/2), self.complex, 0)]
             
             if self.method == 'Nyquist':
             
@@ -717,9 +719,9 @@ class FastFourierTransformX(FastFourierTransformY):
                 
                 # Transform to y
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_x, self.P1)
-                Uc_pad_hat_xy = self.copy_to_padded_y(Uc_pad_hat_y, Uc_pad_hat_xy)
+                Uc_pad_hat_xy2 = self.copy_to_padded_y(Uc_pad_hat_y, Uc_pad_hat_xy2)
                 
-                Uc_pad_hat_xy = ifft(Uc_pad_hat_xy*self.padsize, Uc_pad_hat_xy, axis=1, threads=self.threads)
+                Uc_pad_hat_xy[:] = ifft(Uc_pad_hat_xy2*self.padsize, Uc_pad_hat_xy2, axis=1, threads=self.threads)
                     
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
@@ -734,8 +736,7 @@ class FastFourierTransformX(FastFourierTransformY):
             elif self.method == 'Swap':
                 Uc_pad_hat_y2_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2f), self.complex, 0)]
                 Uc_pad_hat_y2 = Uc_pad_hat_y2_T.transpose((1, 0, 2))
-                Uc_pad_hat_xy2_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2f), self.complex, 0)]
-                Uc_pad_hat_xy2 = Uc_pad_hat_xy2_T.transpose((1, 0, 2))
+                Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2f), self.complex, 0)]
                 
                 xy_plane_T  = self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0])), self.complex, 0)]
                 xy_plane  = xy_plane_T.transpose((1, 0))
@@ -786,8 +787,7 @@ class FastFourierTransformX(FastFourierTransformY):
             Uc_hat_y  = Uc_hat_y_T.transpose((1, 0, 2))
             
             if self.method == 'Nyquist':
-                Uc_hat_y2_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 1)]
-                Uc_hat_y2  = Uc_hat_y_T.transpose((1, 0, 2))
+                Uc_hat_y2= self.work_arrays[((self.N1[0], self.N[1], self.N2[2]/2), self.complex, 1)]
                 
                 # Do fft in z direction on owned data
                 Uc_hat_z = rfft(u, Uc_hat_z, axis=2, threads=self.threads)
@@ -809,9 +809,8 @@ class FastFourierTransformX(FastFourierTransformY):
             elif self.method == 'Swap':
                 Uc_hat_y2  = self.work_arrays[((self.N1[0], self.N[1], self.N2f), self.complex, 0)]
                 Uc_hat_x2  = self.work_arrays[((self.N[0], self.N1[1], self.N2f), self.complex, 0)]
-                Uc_hat_y3_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 1)]
-                Uc_hat_y3  = Uc_hat_y3_T.transpose((1, 0, 2))
-                xy_plane_T  = self.work_arrays[((self.N[1], self.N1[0]), self.complex, 0)]
+                Uc_hat_y3  = self.work_arrays[((self.N1[0], self.N[1], self.N2[2]/2), self.complex, 0)]
+                xy_plane_T = self.work_arrays[((self.N[1], self.N1[0]), self.complex, 0)]
                 xy_plane = xy_plane_T.transpose((1, 0))
                 xy_plane2 = self.work_arrays[((self.N[1]/2+1, self.N1[0]), self.complex, 0)]
                 
@@ -862,6 +861,7 @@ class FastFourierTransformX(FastFourierTransformY):
             Uc_pad_hat_x  = self.work_arrays[((int(padsize*N[0]), N1[1], N2[2]/2), self.complex, 0)]
             Uc_pad_hat_xy_T= self.work_arrays[((int(padsize*N[1]), int(padsize*N1[0]), N2[2]/2), self.complex, 0)]
             Uc_pad_hat_xy  = Uc_pad_hat_xy_T.transpose((1, 0, 2))
+            Uc_pad_hat_xy2= self.work_arrays[((int(padsize*N1[0]), int(padsize*N[1]), N2[2]/2), self.complex, 0)]          
             Uc_pad_hat_y_T= self.work_arrays[((N[1], int(padsize*N1[0]), N2[2]/2), self.complex, 0)]
             Uc_pad_hat_y  = Uc_pad_hat_y_T.transpose((1, 0, 2))
             Uc_pad_hat_z  = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), Nf), self.complex, 0)]
@@ -879,9 +879,9 @@ class FastFourierTransformX(FastFourierTransformY):
                 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
-                Uc_pad_hat_xy = fft(Uc_pad_hat_xy/padsize, Uc_pad_hat_xy, axis=1, threads=self.threads)
+                Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy/padsize, Uc_pad_hat_xy2, axis=1, threads=self.threads)
                 
-                Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy, Uc_pad_hat_y)
+                Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy2, Uc_pad_hat_y)
                 
                 # Communicate and transform to final x-direction
                 Uc_pad_hat_x = transform_Uc_xy(Uc_pad_hat_x, Uc_pad_hat_y, self.P1)
@@ -912,9 +912,9 @@ class FastFourierTransformX(FastFourierTransformY):
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
-                Uc_pad_hat_xy = fft(Uc_pad_hat_xy/padsize, Uc_pad_hat_xy, axis=1, threads=self.threads)
+                Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy/padsize, Uc_pad_hat_xy2, axis=1, threads=self.threads)
                 
-                Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy, Uc_pad_hat_y)
+                Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy2, Uc_pad_hat_y)
                 
                 Uc_pad_hat_y2[:, :, :self.N2[2]/2] = Uc_pad_hat_y[:]
                 

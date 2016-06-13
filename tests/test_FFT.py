@@ -65,6 +65,7 @@ def test_FFT(FFT):
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     a[:] = A[FFT.real_local_slice()]
     c = FFT.fftn(a, c)
+    print abs((c - B2[FFT.complex_local_slice()])/c.max()).max()
     assert all(abs((c - B2[FFT.complex_local_slice()])/c.max()) < rtol)
     #assert allclose(c, B2[FFT.complex_local_slice()], rtol, atol)
     a = FFT.ifftn(c, a)
@@ -284,9 +285,9 @@ def test_FFT_c2c(FFT_c2c):
     #print "X: ", tx
 
 #test_FFT(slab_FFT(array([N, N, N]), L, MPI, "double"))
-#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", method='Nyquist'))
+#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", method='Swap'))
 #test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
-#test_FFT2_padded(line_FFT(array([N, N]), L[:-1], MPI, "single"))
-test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double"))
-#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="X", method='Swap'))
+#test_FFT2_padded(line_FFT(array([N, N]), L[:-1], MPI, "double"))
+#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double"))
+#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="X", method='Nyquist'))
 #test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "double"))

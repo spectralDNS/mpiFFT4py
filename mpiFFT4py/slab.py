@@ -554,6 +554,7 @@ class c2c(FastFourierTransform):
                 # Intermediate work arrays required for transform
                 Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0)]
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0)]
+                fu2 = self.work_arrays[(fu, 0, False)]
 
                 # Do 2 ffts in y-z directions on owned data
                 Uc_hatT = fft2(u, Uc_hatT, axes=(1,2), threads=self.threads)
@@ -562,7 +563,7 @@ class c2c(FastFourierTransform):
                 Uc_mpi[:] = np.rollaxis(Uc_hatT.reshape(self.Np[0], self.num_processes, self.Np[1], self.Nf), 1)
                     
                 # Communicate all values
-                self.comm.Alltoall([Uc_mpi, self.mpitype], [fu, self.mpitype])  
+                self.comm.Alltoall([Uc_mpi, self.mpitype], [fu2, self.mpitype])  
             
             else:
                 # Communicating intermediate result 
@@ -575,7 +576,7 @@ class c2c(FastFourierTransform):
                 fu_send[:] = fu_send.transpose(0,2,1,3)
                             
             # Do fft for last direction 
-            fu = fft(fu, axis=0, threads=self.threads)
+            fu = fft(fu2, fu, axis=0, threads=self.threads)
         
         else:
             # Intermediate work arrays required for transform
