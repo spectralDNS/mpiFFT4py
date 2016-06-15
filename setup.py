@@ -28,9 +28,9 @@ class build_ext_subclass(build_ext):
             e.extra_compile_args = extra_compile_args
         build_ext.build_extensions(self)
 
-#ext = cythonize(os.path.join(cdir, "*.pyx"))
-#[e.include_dirs.extend([get_include()]) for e in ext]
-#cmdclass = {'build_ext': build_ext_subclass}
+ext = cythonize(os.path.join(cdir, "*.pyx"))
+[e.include_dirs.extend([get_include()]) for e in ext]
+cmdclass = {'build_ext': build_ext_subclass}
 
 setup(name = "mpiFFT4py",
       version = "%d.%d.%d" % (major, minor, maintenance),
@@ -55,6 +55,6 @@ setup(name = "mpiFFT4py",
                   "mpiFFT4py.cython"
                   ],
       package_dir = {"mpiFFT4py": "mpiFFT4py"}
-      #ext_modules = ext,
-      #cmdclass = cmdclass
+      ext_modules = ext,
+      cmdclass = cmdclass
     )
