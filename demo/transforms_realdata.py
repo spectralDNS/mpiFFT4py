@@ -7,8 +7,6 @@ from numpy import *
 from mpi4py import MPI
 #from mpiFFT4py.pencil import FastFourierTransform
 from mpiFFT4py.slab import FastFourierTransform
-import pyximport
-pyximport.install()
 
 #assert MPI.COMM_WORLD.Get_size() >= 4
 
@@ -23,7 +21,7 @@ L = array([2*pi, 2*pi, 2*pi], dtype=float)
 # physical space is shared amongst the processors, whereas in wavenumber space the second 
 # index is shared.
 #FFT = FastFourierTransform(N, L, MPI, "double", None, alignment='Y')
-FFT = FastFourierTransform(N, L, MPI, "double")
+FFT = FastFourierTransform(N, L, MPI, "double", communication='alltoall')
 
 U = random.random(FFT.real_shape()).astype(FFT.float) # real_shape = (N[0]/comm.Get_size(), N[1], N[2])
 U_hat = zeros(FFT.complex_shape(), dtype=FFT.complex) # complex_shape = (N[0], N[1]//comm.Get_size(), N[2]/2+1)
@@ -34,6 +32,6 @@ for i in range(10):
 
 # Perform inverse FFT. 
 U_copy = zeros_like(U)
-U_copy = FFT.ifftn(U_hat, U_copy, dealias='2/3-rule')
+U_copy = FFT.ifftn(U_hat, U_copy)
 
 assert allclose(U, U_copy)

@@ -250,7 +250,6 @@ class FastFourierTransform(object):
                 ## Communicate all values
                 self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
                 #Uc_hatT = np.rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
-                
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
                 Uc_hatT = transpose_Uc(Uc_hatT, Uc_mpi, self.num_processes, self.Np[1], self.Nf)
                 
