@@ -18,7 +18,11 @@ from collections import defaultdict
     #for i in xrange(num_processes): 
         #U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
     #return U_mpi
-    
+
+# Using Lisandro Dalcin's code for Alltoallw.
+# Note that _subsize and _distribution are only really required for
+# general shape meshes. Here we require power two.
+
 def _subsize(N, size, rank):
     return N // size + (N % size > rank)
 

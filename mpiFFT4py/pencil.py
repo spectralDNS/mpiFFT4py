@@ -10,9 +10,12 @@ from collections import defaultdict
 
 #__all__ = ['FastFourierTransform']
 
+# Using Lisandro Dalcin's code for Alltoallw.
+# Note that _subsize and _distribution are modified for a mesh of power two.
+
 def _subsize(N, size, rank):
     return N // size + ((N % size) * (rank == size -1))
-    #return N // size + (N % size > rank)
+    #return N // size + (N % size > rank) # Generic
 
 def _distribution(N, size):
     q = N // size
@@ -26,20 +29,21 @@ def _distribution(N, size):
         yield n, s
         i += 1
 
-def _distribution2(N, size):        
-    q = N // size
-    r = N % size
-    n = s = i = 0
-    while i < size:
-        n = q
-        s = q * i
-        if i < r:
-            n += 1
-            s += i
-        else:
-            s += r
-        yield n, s
-        i += 1
+# Generic
+#def _distribution2(N, size):        
+    #q = N // size
+    #r = N % size
+    #n = s = i = 0
+    #while i < size:
+        #n = q
+        #s = q * i
+        #if i < r:
+            #n += 1
+            #s += i
+        #else:
+            #s += r
+        #yield n, s
+        #i += 1
 
 
 def transform_Uc_xz(Uc_hat_x, Uc_hat_z, P1):
