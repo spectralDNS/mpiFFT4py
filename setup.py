@@ -2,8 +2,8 @@
 
 import os, sys, platform
 from distutils.core import setup, Extension
-#from Cython.Distutils import build_ext
-#from Cython.Build import cythonize
+from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 from numpy import get_include
 
 # Version number
