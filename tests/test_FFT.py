@@ -18,17 +18,18 @@ ks = (fftfreq(N)*N).astype(int)
 
 @pytest.fixture(params=("pencilsys", "pencilsyd", "pencilnys", "pencilnyd", 
                         "pencilsxd", "pencilsxs", "pencilnxd", "pencilnxs", 
-                        "slabs", "slabd"), scope='module')
+                        "pencilaxd", "pencilaxs", "pencilayd", "pencilays",
+                        "slabas", "slabad", "slabws", "slabwd"), scope='module')
 def FFT(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
     if request.param[:3] == "pen":
-        if request.param[-3] == 's':
-            return pencil_FFT(array([N, N, N]), L, MPI, prec, None, method='Swap', alignment=string.upper(request.param[-2]))
-        elif request.param[-3] == 'n':
-            return pencil_FFT(array([N, N, N]), L, MPI, prec, None, method='Nyquist', alignment=string.upper(request.param[-2]))
+        communication = {"s": "Swap", "n": "Nyquist", "a": "Alltoallw"}[request.param[-3]]
+        alignment = string.upper(request.param[-2])
+        return pencil_FFT(array([N, N, N]), L, MPI, prec, communication=communication, alignment=alignment)
     else:
-        return slab_FFT(array([N, N, N]), L, MPI, prec)
-
+        comm = 'alltoall' if request.param[-2] == 'a' else 'Alltoallw'
+        return slab_FFT(array([N, N, N]), L, MPI, prec, communication=comm)
+        
 @pytest.fixture(params=("lines", "lined"), scope='module')
 def FFT2(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
@@ -44,12 +45,11 @@ def FFT_c2c(request):
 def test_FFT(FFT):
     if FFT.rank == 0:
         A = random((N, N, N)).astype(FFT.float)
-        if hasattr(FFT, 'method'):
-            if FFT.method == 'Nyquist':
-                C = empty(FFT.global_complex_shape(), dtype=FFT.complex)
-                C = rfftn(A, C, axes=(0,1,2))
-                C[:, :, -1] = 0  # Remove Nyquist frequency
-                A = irfftn(C, A, axes=(0,1,2))
+        if FFT.communication == 'Nyquist':
+            C = empty(FFT.global_complex_shape(), dtype=FFT.complex)
+            C = rfftn(A, C, axes=(0,1,2))
+            C[:, :, -1] = 0  # Remove Nyquist frequency
+            A = irfftn(C, A, axes=(0,1,2))
         B2 = zeros((N, N, N/2+1), dtype=FFT.complex)
         B2 = rfftn(A, B2, axes=(0,1,2))
 
@@ -65,11 +65,11 @@ def test_FFT(FFT):
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     a[:] = A[FFT.real_local_slice()]
     c = FFT.fftn(a, c)
-    print abs((c - B2[FFT.complex_local_slice()])/c.max()).max()
+    #print abs((c - B2[FFT.complex_local_slice()])/c.max()).max()
     assert all(abs((c - B2[FFT.complex_local_slice()])/c.max()) < rtol)
     #assert allclose(c, B2[FFT.complex_local_slice()], rtol, atol)
     a = FFT.ifftn(c, a)
-    print abs((a - A[FFT.real_local_slice()])/a.max()).max()
+    #print abs((a - A[FFT.real_local_slice()])/a.max()).max()
     
     assert all(abs((a - A[FFT.real_local_slice()])/a.max()) < rtol)
     #assert allclose(a, A[FFT.real_local_slice()], rtol, atol)
@@ -154,9 +154,8 @@ def test_FFT_padded(FFT):
         # Eliminate Nyquist, otherwise test will fail
         C[-N[0]/2] = 0
         C[:, -N[1]/2] = 0
-        if hasattr(FFT, 'method'):
-            if FFT.method == 'Nyquist':
-                C[:, :, -1] = 0  # Remove Nyquist frequency
+        if FFT.communication == 'Nyquist':
+            C[:, :, -1] = 0  # Remove Nyquist frequency
         
         A = irfftn(C, A)
         
@@ -196,6 +195,7 @@ def test_FFT_padded(FFT):
     
     atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
     
+    #print np.linalg.norm(ap-ae)
     assert allclose(ap, ae, rtol, atol)
     
     cp = FFT.fftn(ap, cp, dealias="3/2-rule")    
@@ -275,9 +275,9 @@ def test_FFT_c2c(FFT_c2c):
     
 #import time
 #t0 = time.time()
-#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", method='Swap'))
+#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Swap'))
 #t1 = time.time()
-#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", method='Swap'))
+#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", communication='Swap'))
 #t2 = time.time()
 
 #ty = MPI.COMM_WORLD.reduce(t1-t0, op=MPI.MIN)
@@ -286,10 +286,10 @@ def test_FFT_c2c(FFT_c2c):
     #print "Y: ", ty
     #print "X: ", tx
 
-#test_FFT(slab_FFT(array([N, N, N]), L, MPI, "double"))
-test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", method='Swap'))
+#test_FFT(slab_FFT(array([N, N, N]), L, MPI, "double", communication='Sendrecv_replace'))
+#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
 #test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
 #test_FFT2_padded(line_FFT(array([N, N]), L[:-1], MPI, "double"))
-#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double"))
-#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", P1=2, alignment="X", method='Nyquist'))
+#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double", communication='alltoall'))
+#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
 #test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "double"))
