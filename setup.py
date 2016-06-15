@@ -54,7 +54,7 @@ setup(name = "mpiFFT4py",
                   "mpiFFT4py.serialFFT",
                   "mpiFFT4py.cython"
                   ],
-      package_dir = {"mpiFFT4py": "mpiFFT4py"}
+      package_dir = {"mpiFFT4py": "mpiFFT4py"},
       ext_modules = ext,
       cmdclass = cmdclass
     )
