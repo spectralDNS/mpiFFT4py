@@ -7,6 +7,8 @@ from numpy import *
 from mpi4py import MPI
 #from mpiFFT4py.pencil import FastFourierTransform
 from mpiFFT4py.slab import FastFourierTransform
+import pyximport
+pyximport.install()
 
 #assert MPI.COMM_WORLD.Get_size() >= 4
 
@@ -32,6 +34,6 @@ for i in range(10):
 
 # Perform inverse FFT. 
 U_copy = zeros_like(U)
-U_copy = FFT.ifftn(U_hat, U_copy)
+U_copy = FFT.ifftn(U_hat, U_copy, dealias='2/3-rule')
 
 assert allclose(U, U_copy)

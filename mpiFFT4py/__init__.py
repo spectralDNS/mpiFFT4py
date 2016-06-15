@@ -1,3 +1,6 @@
+import pyximport
+pyximport.install()
+from cython.maths import *
 from serialFFT import *
 from slab import FastFourierTransform as slab_FFT
 from pencil import FastFourierTransform as pencil_FFT
