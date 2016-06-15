@@ -11,7 +11,7 @@ from mpiFFT4py.slab import FastFourierTransform
 #assert MPI.COMM_WORLD.Get_size() >= 4
 
 # Set global size of the computational box
-M = 8
+M = 6
 N = array([2**M, 2**M, 2**M], dtype=int)
 L = array([2*pi, 2*pi, 2*pi], dtype=float)
 
