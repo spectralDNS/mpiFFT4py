@@ -8,7 +8,8 @@ import numpy as np
 from mpibase import work_arrays, datatypes
 import pyximport
 pyximport.install(pyximport=True)
-from cython.maths import dealias_filter, transpose_Uc, transpose_Umpi
+import cython.maths
+#from cython.maths import dealias_filter, transpose_Uc, transpose_Umpi
 from collections import defaultdict
 
 #def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
