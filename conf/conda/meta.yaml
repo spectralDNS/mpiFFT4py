@@ -19,6 +19,7 @@ requirements:
     - numpy
     - scipy
     - mpi4py
+    - cython
 
 test:
     requires:
