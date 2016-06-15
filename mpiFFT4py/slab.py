@@ -6,10 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from serialFFT import *
 import numpy as np
 from mpibase import work_arrays, datatypes
-import pyximport
-pyximport.install(pyximport=True)
-import cython.maths
-#from cython.maths import dealias_filter, transpose_Uc, transpose_Umpi
+from cython.maths import dealias_filter, transpose_Uc, transpose_Umpi
 from collections import defaultdict
 
 #def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
