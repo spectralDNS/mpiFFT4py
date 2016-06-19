@@ -41,7 +41,7 @@ def _distribution(N, size):
         yield n, s
         i += 1
 
-class FastFourierTransform(object):
+class R2C(object):
     """Class for performing FFT in 3D using MPI
     
     Slab decomposition
@@ -79,10 +79,8 @@ class FastFourierTransform(object):
         self.dealias = np.zeros(0)
         self.padsize = padsize
         self.threads = threads
-        self.transform = 'r2c/c2r'
         self.planner_effort = planner_effort
         self.work_arrays = work_arrays()
-        self.ks = (fftfreq(N[1])*N[1]).astype(int)
         if not self.num_processes in [2**i for i in range(int(np.log2(N[0]))+1)]:
             raise IOError("Number of cpus must be in ", [2**i for i in range(int(np.log2(N[0]))+1)])
         self._subarraysA = []
@@ -224,8 +222,10 @@ class FastFourierTransform(object):
 
                 # First create padded complex array and then perform irfftn
                 fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0, False)]
-                fu_padded[:self.N[0]/2, self.ks, :self.Nf] = fu[:self.N[0]/2]
-                fu_padded[-self.N[0]/2:, self.ks, :self.Nf] = fu[self.N[0]/2:]
+                fu_padded[:self.N[0]/2, :self.N[1]/2, :self.Nf] = fu[:self.N[0]/2, :self.N[1]/2]
+                fu_padded[:self.N[0]/2, -self.N[1]/2:, :self.Nf] = fu[:self.N[0]/2, self.N[1]/2:]
+                fu_padded[-self.N[0]/2:, :self.N[1]/2, :self.Nf] = fu[self.N[0]/2:, :self.N[1]/2]
+                fu_padded[-self.N[0]/2:, -self.N[1]/2:, :self.Nf] = fu[self.N[0]/2:, -self.N[1]/2:]
                 
                 ## Current transform is only exactly reversible if periodic transforms are made symmetric
                 ## However, this seems to lead to more aliasing and as such the non-symmetrical padding is used
@@ -285,7 +285,7 @@ class FastFourierTransform(object):
             Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0)]
             
             # Expand in x-direction and perform ifft
-            Upad_hat = self.copy_to_padded_x(fu, Upad_hat)
+            Upad_hat = R2C.copy_to_padded(fu, Upad_hat, self.N, axis=0)
             Upad_hat[:] = ifft(Upad_hat, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
             
             if not self.communication == 'Alltoallw':
@@ -301,11 +301,11 @@ class FastFourierTransform(object):
                     [Upad_hat1, self._counts_displs, self._subarraysB_pad])
             
             # Transpose data and pad in y-direction before doing ifft. Now data is padded in x and y 
-            Upad_hat2 = self.copy_to_padded_y(Upad_hat1, Upad_hat2)
+            Upad_hat2 = R2C.copy_to_padded(Upad_hat1, Upad_hat2, self.N, axis=1)
             Upad_hat2[:] = ifft(Upad_hat2, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
             
             # pad in z-direction and perform final irfft
-            Upad_hat3 = self.copy_to_padded_z(Upad_hat2, Upad_hat3)
+            Upad_hat3 = R2C.copy_to_padded(Upad_hat2, Upad_hat3, self.N, axis=2)
             u[:] = irfft(Upad_hat3*self.padsize**3, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
             
         return u
@@ -336,7 +336,6 @@ class FastFourierTransform(object):
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
                 assert u.shape == self.real_shape()
-                
                 fu = rfftn(u, fu, axes=(0,1,2), threads=self.threads, planner_effort=self.planner_effort['rfftn'])
             
             else:
@@ -346,8 +345,10 @@ class FastFourierTransform(object):
                 fu_padded[:] = rfftn(u/self.padsize**3, overwrite_input=True, axes=(0,1,2), planner_effort=self.planner_effort['rfftn'])
                 
                 # Copy with truncation
-                fu[:self.N[0]/2] = fu_padded[:self.N[0]/2, self.ks, :self.Nf] 
-                fu[self.N[0]/2:] = fu_padded[-self.N[0]/2:, self.ks, :self.Nf] 
+                fu[:self.N[0]/2, :self.N[1]/2] = fu_padded[:self.N[0]/2, :self.N[1]/2, :self.Nf] 
+                fu[:self.N[0]/2, self.N[1]/2:] = fu_padded[:self.N[0]/2, -self.N[1]/2:, :self.Nf]                 
+                fu[self.N[0]/2:, :self.N[1]/2] = fu_padded[-self.N[0]/2:, :self.N[1]/2, :self.Nf] 
+                fu[self.N[0]/2:, self.N[1]/2:] = fu_padded[-self.N[0]/2:, -self.N[1]/2:, :self.Nf] 
                 
                 ## Modify for symmetric padding
                 #fu[:, -self.N[1]/2] *= 2
@@ -420,7 +421,7 @@ class FastFourierTransform(object):
             Upad_hat3 = rfft2(u/self.padsize**2, overwrite_input=True, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['rfft2'])
             
             # Copy with truncation 
-            Upad_hat1 = self.copy_from_padded(Upad_hat3, Upad_hat1)
+            Upad_hat1 = R2C.copy_from_padded(Upad_hat3, Upad_hat1, self.N, 1)
             
             if not self.communication == 'Alltoallw':
                 # Transpose and commuincate data
@@ -472,27 +473,29 @@ class FastFourierTransform(object):
     def complex_shape_padded_I(self):
         """A local intermediate shape of the complex data"""
         return (int(self.padsize*self.Np[0]), self.num_processes, self.Np[1], self.Nf)
-    
-    def copy_to_padded_x(self, fu, fp):
-        fp[:self.N[0]/2] = fu[:self.N[0]/2]
-        fp[-(self.N[0]/2):] = fu[self.N[0]/2:]
-        return fp
-
-    def copy_to_padded_y(self, fu, fp):
-        fp[:, :self.N[1]/2] = fu[:, :self.N[1]/2]
-        fp[:, -(self.N[1]/2):] = fu[:, self.N[1]/2:]
-        return fp
-    
-    def copy_to_padded_z(self, fu, fp):
-        fp[:, :, :self.Nf] = fu[:]
+        
+    @staticmethod
+    def copy_to_padded(fu, fp, N, axis=0):
+        if axis == 0:
+            fp[:N[0]/2] = fu[:N[0]/2]
+            fp[-N[0]/2:] = fu[N[0]/2:]
+        elif axis == 1:
+            fp[:, :N[1]/2] = fu[:, :N[1]/2]
+            fp[:, -N[1]/2:] = fu[:, N[1]/2:]
+        elif axis == 2:
+            fp[:, :, :(N[2]/2+1)] = fu[:]        
         return fp
     
-    def copy_from_padded(self, fp, fu):
-        fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, :self.Nf]
-        fu[:, self.N[1]/2:] = fp[:, -(self.N[1]/2):, :self.Nf]
+    @staticmethod
+    def copy_from_padded(fp, fu, N, axis=0):
+        if axis == 1:
+            fu[:, :N[1]/2] = fp[:, :N[1]/2, :(N[2]/2+1)]
+            fu[:, N[1]/2:] = fp[:, -N[1]/2:, :(N[2]/2+1)]
+        elif axis == 2:
+            fu[:] = fp[:, :, :(N[2]//2+1)]
         return fu
 
-class c2c(FastFourierTransform):
+class C2C(R2C):
     """Class for performing FFT in 3D using MPI
     
     Slab decomposition
@@ -514,14 +517,13 @@ class c2c(FastFourierTransform):
     
     def __init__(self, N, L, MPI, precision, communication="alltoall", padsize=1.5, threads=1, 
                  planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
-        FastFourierTransform.__init__(self, N, L, MPI, precision, 
-                                      communication=communication, 
-                                      padsize=padsize, threads=threads,
-                                      planner_effort=planner_effort)
-        # Reuse all shapes from r2c transform FastFourierTransform simply by resizing the final complex z-dimension:
+        R2C.__init__(self, N, L, MPI, precision, 
+                     communication=communication, 
+                     padsize=padsize, threads=threads,
+                     planner_effort=planner_effort)
+        # Reuse all shapes from r2c transform R2C simply by resizing the final complex z-dimension:
         self.Nf = N[2]      
         self.Nfp = int(self.padsize*self.N[2]) # Number of independent complex wavenumbers in z-direction for padded array
-        self.transform = 'c2c/c2c'
         
         # Rename since there's no real space 
         self.original_shape_padded = self.real_shape_padded
@@ -619,7 +621,7 @@ class c2c(FastFourierTransform):
             Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
 
             # Expand in x-direction and perform ifft
-            Upad_hat = self.copy_to_padded_x(fu, Upad_hat)
+            Upad_hat = C2C.copy_to_padded(fu, Upad_hat, self.N, axis=0)
             Upad_hat[:] = ifft(Upad_hat*self.padsize, overwrite_input=True, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])  
             
             # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir and z-direction of full size)            
@@ -627,11 +629,11 @@ class c2c(FastFourierTransform):
             
             # Transpose data and pad in y-direction before doing ifft. Now data is padded in x and y 
             Upad_hat1[:] = np.rollaxis(U_mpi, 1).reshape(Upad_hat1.shape)
-            Upad_hat2 = self.copy_to_padded_y(Upad_hat1, Upad_hat2)
+            Upad_hat2 = C2C.copy_to_padded(Upad_hat1, Upad_hat2, self.N, axis=1)
             Upad_hat2[:] = ifft(Upad_hat2*self.padsize, overwrite_input=True, axis=1)
             
             # pad in z-direction and perform final ifft
-            Upad_hat3 = self.copy_to_padded_z(Upad_hat2, Upad_hat3)
+            Upad_hat3 = C2C.copy_to_padded(Upad_hat2, Upad_hat3, self.N, axis=2)
             u = ifft(Upad_hat3*self.padsize, u, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['ifft'])
             
         return u
@@ -718,7 +720,7 @@ class c2c(FastFourierTransform):
             Upad_hat3[:] = fft2(u/self.padsize**2, overwrite_input=True, axes=(1,2), threads=self.threads, planner_effort=self.planner_effort['fft2']) 
             
             # Copy with truncation 
-            Upad_hat1 = self.copy_from_padded(Upad_hat3, Upad_hat1)
+            Upad_hat1 = C2C.copy_from_padded(Upad_hat3, Upad_hat1, self.N, 1)
             
             # Transpose and commuincate data
             U_mpi[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1)
@@ -732,24 +734,26 @@ class c2c(FastFourierTransform):
             fu[self.N[0]/2:] = Upad_hat[-self.N[0]/2:]
         
         return fu
-    
-    def copy_to_padded_x(self, fu, fp):
-        fp[:self.N[0]/2] = fu[:self.N[0]/2]
-        fp[-(self.N[0]/2):] = fu[self.N[0]/2:]
-        return fp
 
-    def copy_to_padded_y(self, fu, fp):
-        fp[:, :self.N[1]/2] = fu[:, :self.N[1]/2]
-        fp[:, -(self.N[1]/2):] = fu[:, self.N[1]/2:]
+    @staticmethod
+    def copy_to_padded(fu, fp, N, axis=0):
+        if axis == 0:
+            fp[:N[0]/2] = fu[:N[0]/2]
+            fp[-N[0]/2:] = fu[N[0]/2:]
+        elif axis == 1:
+            fp[:, :N[1]/2] = fu[:, :N[1]/2]
+            fp[:, -N[1]/2:] = fu[:, N[1]/2:]
+        elif axis == 2:
+            fp[:, :, :N[2]/2] = fu[:, :, :N[2]/2]
+            fp[:, :, -N[2]/2:] = fu[:, :, N[2]/2:]
         return fp
-    
-    def copy_to_padded_z(self, fu, fp):
-        fp[:, :, :self.N[2]/2] = fu[:, :, :self.N[2]/2]
-        fp[:, :, -self.N[2]/2:] = fu[:, :, self.N[2]/2:]
-        return fp
-    
-    def copy_from_padded(self, fp, fu):
-        ks = (fftfreq(self.N[2])*self.N[2]).astype(int)        
-        fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2, ks]
-        fu[:, self.N[1]/2:] = fp[:, -self.N[1]/2:, ks]
+        
+    @staticmethod
+    def copy_from_padded(fp, fu, N, axis=0):
+        if axis == 1:
+            fu[:, :N[1]/2, :N[2]/2] = fp[:, :N[1]/2, :N[2]/2]
+            fu[:, :N[1]/2, N[2]/2:] = fp[:, :N[1]/2, -N[2]/2:]
+            fu[:, N[1]/2:, :N[2]/2] = fp[:, -N[1]/2:, :N[2]/2]
+            fu[:, N[1]/2:, N[2]/2:] = fp[:, -N[1]/2:, -N[2]/2:]
+            
         return fu

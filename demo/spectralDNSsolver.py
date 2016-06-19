@@ -6,7 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from numpy import *
 from mpi4py import MPI
 from mpiFFT4py import work_arrays
-from mpiFFT4py.slab import FastFourierTransform
+from mpiFFT4py.slab import R2C
 from collections import defaultdict
 
 # Set viscosity, end time and time step
@@ -18,12 +18,12 @@ dt = 0.01
 N = array([2**5, 2**5, 2**5], dtype=int)
 L = array([2*pi, 2*pi, 2*pi], dtype=float)
 
-# Create an instance of the FastFourierTransform class for performing 3D FFTs in parallel
+# Create an instance of the R2C class for performing 3D FFTs in parallel
 # on a cube of size N points and physical size L. The mesh decomposition is performed by 
 # the FFT class using a slab decomposition. With slab decomposition the first index in real
 # physical space is shared amongst the processors, whereas in wavenumber space the second 
 # index is shared.
-FFT = FastFourierTransform(N, L, MPI, "double", planner_effort=defaultdict(lambda: 'FFTW_ESTIMATE', {'irfft2': 'FFTW_PATIENT'}))
+FFT = R2C(N, L, MPI, "double", planner_effort=defaultdict(lambda: 'FFTW_ESTIMATE', {'irfft2': 'FFTW_PATIENT'}))
 
 U     = empty((3,) + FFT.real_shape())                    # real_shape = (N[0]/comm.Get_size(), N[1], N[2])
 U_hat = empty((3,) + FFT.complex_shape(), dtype=complex)  # complex_shape = (N[0], N[1]//comm.Get_size(), N[2]/2+1)

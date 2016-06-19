@@ -49,3 +49,29 @@ def transpose_Umpi(np.ndarray[complex_t, ndim=4] U_mpi,
                 #for l in xrange(Nf):
                     #U_mpi[i,j,kk,l] = Uc_hatT[j,k,l]
     #return U_mpi
+
+#def copy_to_padded(np.ndarray[complex_t, ndim=3] fu, 
+                   #np.ndarray[complex_t, ndim=3] fp, 
+                   #np.ndarray[int, ndim=1] N, int axis=0):
+    #if axis == 0:
+        #fp[:N[0]/2] = fu[:N[0]/2]
+        #fp[-N[0]/2:] = fu[N[0]/2:]
+    #elif axis == 1:
+        #fp[:, :N[1]/2] = fu[:, :N[1]/2]
+        #fp[:, -N[1]/2:] = fu[:, N[1]/2:]
+    #elif axis == 2:
+        #fp[:, :, :(N[2]/2+1)] = fu[:]        
+    #return fp
+
+#def copy_to_padded_c(np.ndarray[complex_t, ndim=3] fu, 
+                     #np.ndarray[complex_t, ndim=3] fp, 
+                     #np.ndarray[int, ndim=1] N, int axis=0):
+    #if axis == 0:
+        #fp[:N[0]] = fu[:N[0]]
+    #elif axis == 1:
+        #fp[:, :N[1]/2] = fu[:, :N[1]/2]
+        #fp[:, -N[1]/2:] = fu[:, N[1]/2:]
+    #elif axis == 2:
+        #fp[:, :, :(N[2]/2+1)] = fu[:]        
+    #return fp
+

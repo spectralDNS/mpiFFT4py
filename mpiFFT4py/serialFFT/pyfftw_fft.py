@@ -12,10 +12,10 @@ from numpy import iscomplexobj, zeros_like, float64, ascontiguousarray, zeros as
 from numpy.fft import fftfreq, rfftfreq
 import copy
 
-def empty(N, dtype=float64, bytes=64):
+def empty(N, dtype=float64, bytes=32):
     return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
 
-def zeros(N, dtype=float64, bytes=64):
+def zeros(N, dtype=float64, bytes=32):
     return pyfftw.n_byte_align(npzeros(N, dtype=dtype), bytes)
 
 dct_object    = {}

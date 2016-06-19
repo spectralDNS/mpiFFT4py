@@ -6,11 +6,11 @@ from numpy import allclose, empty, zeros, zeros_like, pi, array, int, all, float
 from numpy.fft import fftfreq
 from mpi4py import MPI
 
-from mpiFFT4py.pencil import FastFourierTransform as pencil_FFT
-from mpiFFT4py.slab import FastFourierTransform as slab_FFT
-from mpiFFT4py.line import FastFourierTransform as line_FFT
+from mpiFFT4py.pencil import R2C as Pencil_R2C
+from mpiFFT4py.slab import R2C as Slab_R2C
+from mpiFFT4py.line import R2C as Line_R2C
 from mpiFFT4py import rfft2, rfftn, irfftn, irfft2, fftn, ifftn, irfft, ifft
-from mpiFFT4py.slab import c2c
+from mpiFFT4py.slab import C2C
 
 N = 2**6
 L = array([2*pi, 2*pi, 2*pi])
@@ -25,21 +25,21 @@ def FFT(request):
     if request.param[:3] == "pen":
         communication = {"s": "Swap", "n": "Nyquist", "a": "Alltoallw"}[request.param[-3]]
         alignment = string.upper(request.param[-2])
-        return pencil_FFT(array([N, N, N]), L, MPI, prec, communication=communication, alignment=alignment)
+        return Pencil_R2C(array([N, N, N]), L, MPI, prec, communication=communication, alignment=alignment)
     else:
         comm = 'alltoall' if request.param[-2] == 'a' else 'Alltoallw'
-        return slab_FFT(array([N, N, N]), L, MPI, prec, communication=comm)
+        return Slab_R2C(array([N, N, N]), L, MPI, prec, communication=comm)
         
 @pytest.fixture(params=("lines", "lined"), scope='module')
 def FFT2(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
-    return line_FFT(array([N, N]), L[:-1], MPI, prec)
+    return Line_R2C(array([N, N]), L[:-1], MPI, prec)
 
 
 @pytest.fixture(params=("slabd", "slabs"), scope='module')
-def FFT_c2c(request):
+def FFT_C2C(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
-    return c2c(array([N, N, N]), L, MPI, prec)
+    return C2C(array([N, N, N]), L, MPI, prec)
     
 #@profile    
 def test_FFT(FFT):
@@ -210,9 +210,9 @@ def test_FFT_padded(FFT):
     #a3 = A[FFT.real_local_slice()]
     #assert allclose(aa, a3, rtol, atol)
 
-def test_FFT_c2c(FFT_c2c):
+def test_FFT_C2C(FFT_C2C):
     """Test both padded and unpadded transforms"""
-    FFT = FFT_c2c
+    FFT = FFT_C2C
     N = FFT.N
     atol, rtol = (1e-8, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
 
@@ -275,9 +275,9 @@ def test_FFT_c2c(FFT_c2c):
     
 #import time
 #t0 = time.time()
-#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Swap'))
+#test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Swap'))
 #t1 = time.time()
-#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", communication='Swap'))
+#test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", communication='Swap'))
 #t2 = time.time()
 
 #ty = MPI.COMM_WORLD.reduce(t1-t0, op=MPI.MIN)
@@ -286,10 +286,10 @@ def test_FFT_c2c(FFT_c2c):
     #print "Y: ", ty
     #print "X: ", tx
 
-#test_FFT(slab_FFT(array([N, N, N]), L, MPI, "double", communication='Sendrecv_replace'))
-#test_FFT(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
-#test_FFT2(line_FFT(array([N, N]), L[:-1], MPI, "single"))
-#test_FFT2_padded(line_FFT(array([N, N]), L[:-1], MPI, "double"))
-#test_FFT_padded(slab_FFT(array([N, N, N]), L, MPI, "double", communication='alltoall'))
-#test_FFT_padded(pencil_FFT(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
-#test_FFT_c2c(c2c(array([N, N, N]), L, MPI, "double"))
+#test_FFT(Slab_R2C(array([N, N, N]), L, MPI, "double", communication='Sendrecv_replace'))
+#test_FFT(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
+#test_FFT2(Line_R2C(array([N, N]), L[:-1], MPI, "single"))
+#test_FFT2_padded(Line_R2C(array([N, N]), L[:-1], MPI, "double"))
+#test_FFT_padded(Slab_R2C(array([N, N, N]), L, MPI, "double", communication='alltoall'))
+#test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
+#test_FFT_C2C(C2C(array([N, N, N]), L, MPI, "double"))

@@ -8,7 +8,7 @@ import numpy as np
 from mpibase import work_arrays, datatypes
 from collections import defaultdict
 
-#__all__ = ['FastFourierTransform']
+#__all__ = ['R2C']
 
 # Using Lisandro Dalcin's code for Alltoallw.
 # Note that _subsize and _distribution are modified for a mesh of power two.
@@ -82,7 +82,7 @@ def transform_Uc_zy(Uc_hat_z, Uc_hat_y, P):
     Uc_hat_z[:, :, :-1] = np.rollaxis(Uc_hat_y.reshape((sy[0], P, sz[1], sy[2])), 1, 3).reshape((sz[0], sz[1], sz[2]-1)) 
     return Uc_hat_z
 
-class FastFourierTransformY(object):
+class R2CY(object):
     """Class for performing FFT in 3D using MPI
     
     Pencil decomposition
@@ -734,7 +734,7 @@ class FastFourierTransformY(object):
 
             return fu
 
-class FastFourierTransformX(FastFourierTransformY):
+class R2CX(R2CY):
     """Class for performing FFT in 3D using MPI
     
     Pencil decomposition
@@ -755,7 +755,7 @@ class FastFourierTransformX(FastFourierTransformY):
     
     def __init__(self, N, L, MPI, precision, P1=None, communication='Swap', padsize=1.5, threads=1,
                  planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
-        FastFourierTransformY.__init__(self, N, L, MPI, precision, P1=P1, communication=communication, 
+        R2CY.__init__(self, N, L, MPI, precision, P1=P1, communication=communication, 
                                        padsize=padsize, threads=threads, planner_effort=planner_effort)
         self.N2f = self.N2[2]/2 if self.comm1_rank < self.P2-1 else self.N2[2]/2+1
         if self.communication == 'Nyquist':
@@ -1291,9 +1291,9 @@ class FastFourierTransformX(FastFourierTransformY):
             
         return fu
 
-def FastFourierTransform(N, L, MPI, precision, P1=None, communication="Swap", padsize=1.5, threads=1, alignment="X",
+def R2C(N, L, MPI, precision, P1=None, communication="Swap", padsize=1.5, threads=1, alignment="X",
                          planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
     if alignment == 'X':
-        return FastFourierTransformX(N, L, MPI, precision, P1, communication, padsize, threads, planner_effort)
+        return R2CX(N, L, MPI, precision, P1, communication, padsize, threads, planner_effort)
     else:
-        return FastFourierTransformY(N, L, MPI, precision, P1, communication, padsize, threads, planner_effort)
+        return R2CY(N, L, MPI, precision, P1, communication, padsize, threads, planner_effort)

@@ -35,7 +35,7 @@ def swap_Nq(fft_y, fu, fft_x, N):
     fft_y[N/2+1:] = np.conj(fft_y[(N/2-1):0:-1])
     return fft_y
 
-class FastFourierTransform(object):
+class R2C(object):
     """Class for performing FFT in 2D using MPI
     
     Slab decomposition
