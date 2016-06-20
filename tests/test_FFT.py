@@ -286,10 +286,10 @@ def test_FFT_C2C(FFT_C2C):
     #print "Y: ", ty
     #print "X: ", tx
 
-#test_FFT(Slab_R2C(array([N, N, N]), L, MPI, "double", communication='Sendrecv_replace'))
+#test_FFT(Slab_R2C(array([N, N, N]), L, MPI, "single", communication='alltoall'))
 #test_FFT(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
 #test_FFT2(Line_R2C(array([N, N]), L[:-1], MPI, "single"))
 #test_FFT2_padded(Line_R2C(array([N, N]), L[:-1], MPI, "double"))
-#test_FFT_padded(Slab_R2C(array([N, N, N]), L, MPI, "double", communication='alltoall'))
-#test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
+#test_FFT_padded(Slab_R2C(array([N, N, N]), L, MPI, "double", communication='Alltoallw'))
+#test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", communication='Nyquist'))
 #test_FFT_C2C(C2C(array([N, N, N]), L, MPI, "double"))

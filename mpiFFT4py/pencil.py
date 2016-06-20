@@ -414,20 +414,20 @@ class R2CY(object):
                 Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
                 Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]/2), self.complex, 0)]  
 
-                Uc_pad_hat_y = self.copy_to_padded_y(fu, Uc_pad_hat_y)
+                Uc_pad_hat_y = self.copy_to_padded_y(fu*padsize**3, Uc_pad_hat_y)
                 
                 # Do first owned direction
-                Uc_pad_hat_y = ifft(Uc_pad_hat_y*padsize, Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
 
                 # Transform to x all but k=N/2 (the neglected Nyquist mode)
-                Uc_pad_hat_x[:] = transform_Uc_xy(Uc_pad_hat_x, Uc_pad_hat_y, self.P2)
+                Uc_pad_hat_x = transform_Uc_xy(Uc_pad_hat_x, Uc_pad_hat_y, self.P2)
                 
                 # Communicate in xz-plane 
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
                 
                 # Pad and do fft in x-direction
                 Uc_pad_hat_xy = self.copy_to_padded_x(Uc_pad_hat_x, Uc_pad_hat_xy)
-                Uc_pad_hat_xy = ifft(Uc_pad_hat_xy*padsize, Uc_pad_hat_xy, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_xy[:] = ifft(Uc_pad_hat_xy, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                     
                 # Communicate in xy-plane
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
@@ -440,7 +440,7 @@ class R2CY(object):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                 
                 # Do ifft for z-direction
-                u = irfft(Uc_pad_hat_z2*padsize, u, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Uc_pad_hat_z2, u, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
             
             elif self.communication == 'Swap':
                 Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
@@ -451,10 +451,10 @@ class R2CY(object):
                 xy2_pad_recv    = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1])), self.complex, 1)]
                 
                 # Pad in y-direction
-                Uc_pad_hat_y = self.copy_to_padded_y(fu, Uc_pad_hat_y)
+                Uc_pad_hat_y = self.copy_to_padded_y(fu*padsize**3, Uc_pad_hat_y)
 
                 # Transform first owned direction
-                Uc_pad_hat_y = ifft(Uc_pad_hat_y*padsize, Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
 
                 # Transpose datastructure to x
                 Uc_pad_hat_xr2[:] = transform_Uc_xy(Uc_pad_hat_xr2, Uc_pad_hat_y, self.P2)
@@ -464,7 +464,7 @@ class R2CY(object):
                 
                 # Pad and do fft in x-direction
                 Uc_pad_hat_xy3 = self.copy_to_padded_x(Uc_pad_hat_xr2, Uc_pad_hat_xy3)
-                Uc_pad_hat_xy3 = ifft(Uc_pad_hat_xy3*padsize, Uc_pad_hat_xy3, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_xy3[:] = ifft(Uc_pad_hat_xy3, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                                 
                 Uc_pad_hat_xy[:] = Uc_pad_hat_xy3[:, :, :N1[2]/2]
                 
@@ -481,7 +481,7 @@ class R2CY(object):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                 
                 # Do ifft for z-direction
-                u = irfft(Uc_pad_hat_z2*padsize, u, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Uc_pad_hat_z2, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
                 
             elif self.communication == 'Alltoallw':
                 if len(self._subarrays1A_pad) == 0:
@@ -492,10 +492,10 @@ class R2CY(object):
                 Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1f), self.complex, 0)]
                 
                 # Pad in y-direction
-                Uc_pad_hat_y = self.copy_to_padded_y(fu, Uc_pad_hat_y)
+                Uc_pad_hat_y = self.copy_to_padded_y(fu*padsize**3, Uc_pad_hat_y)
 
                 # Transform first owned direction
-                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y*padsize, overwrite_input=True, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
 
                 self.comm1.Alltoallw(
                     [Uc_pad_hat_y, self._counts_displs1, self._subarrays1A_pad],
@@ -503,7 +503,7 @@ class R2CY(object):
                 
                 # Pad and do fft in x-direction
                 Uc_pad_hat_xy = self.copy_to_padded_x(Uc_pad_hat_x, Uc_pad_hat_xy)
-                Uc_pad_hat_xy[:] = ifft(Uc_pad_hat_xy*padsize, overwrite_input=True, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])  
+                Uc_pad_hat_xy[:] = ifft(Uc_pad_hat_xy, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])  
                 
                 self.comm0.Alltoallw(
                     [Uc_pad_hat_xy, self._counts_displs2, self._subarrays2A_pad],
@@ -513,7 +513,7 @@ class R2CY(object):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                 
                 # Do fft for z-direction
-                u[:] = irfft(Uc_pad_hat_z2*padsize, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Uc_pad_hat_z2, u, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
 
             return u
             
@@ -633,7 +633,7 @@ class R2CY(object):
                 Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
                 
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2 = rfft(u/padsize, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -642,7 +642,7 @@ class R2CY(object):
                 
                 # Communicate and do fft in x-direction
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
-                Uc_pad_hat_xy = fft(Uc_pad_hat_xy/padsize, Uc_pad_hat_xy, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 
                 Uc_pad_hat_x = self.copy_from_padded_x(Uc_pad_hat_xy, Uc_pad_hat_x)
                 
@@ -651,8 +651,9 @@ class R2CY(object):
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_x, self.P2)
                                             
                 # Do fft for last direction
-                Uc_pad_hat_y = fft(Uc_pad_hat_y/padsize, Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_y[:] = fft(Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 fu = self.copy_from_padded_y(Uc_pad_hat_y, fu)
+                fu /= padsize**3
             
             elif self.communication == 'Swap':
                 
@@ -663,7 +664,7 @@ class R2CY(object):
                 Uc_pad_hat_xr2  = self.work_arrays[((N[0], int(padsize*N2[1]), N1f), self.complex, 0)]
                 
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2 = rfft(u/padsize, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -675,7 +676,7 @@ class R2CY(object):
                 
                 # Communicate and do fft in x-direction
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
-                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy/padsize, overwrite_input=True, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 
                 Uc_pad_hat_x = self.copy_from_padded_x(Uc_pad_hat_xy, Uc_pad_hat_x)
                 
@@ -700,8 +701,9 @@ class R2CY(object):
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_xr2, self.P2)
                 
                 # Do fft for last direction 
-                Uc_pad_hat_y = fft(Uc_pad_hat_y/padsize, Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_y[:] = fft(Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 fu = self.copy_from_padded_y(Uc_pad_hat_y, fu)
+                fu /= padsize**3
                 
             elif self.communication == 'Alltoallw':
                 if len(self._subarrays1A_pad) == 0:
@@ -712,7 +714,7 @@ class R2CY(object):
                 Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1f), self.complex, 0)]
                 
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2 = rfft(u/padsize, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -720,7 +722,7 @@ class R2CY(object):
                     [Uc_pad_hat_z, self._counts_displs2, self._subarrays2B_pad],
                     [Uc_pad_hat_xy, self._counts_displs2, self._subarrays2A_pad])
                 
-                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy/padsize, overwrite_input=True, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 
                 Uc_pad_hat_x = self.copy_from_padded_x(Uc_pad_hat_xy, Uc_pad_hat_x)
                 
@@ -729,8 +731,9 @@ class R2CY(object):
                     [Uc_pad_hat_y, self._counts_displs1, self._subarrays1A_pad])
                                             
                 # Do fft for last direction 
-                Uc_pad_hat_y[:] = fft(Uc_pad_hat_y/padsize, overwrite_input=True, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_y[:] = fft(Uc_pad_hat_y, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 fu = self.copy_from_padded_y(Uc_pad_hat_y, fu) 
+                fu /= padsize**3
 
             return fu
 
@@ -960,10 +963,10 @@ class R2CX(R2CY):
                 Uc_pad_hat_xy = Uc_pad_hat_xy_T.transpose((1, 0, 2))
                 Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2[2]/2), self.complex, 0)]
             
-                Uc_pad_hat_x = self.copy_to_padded_x(fu, Uc_pad_hat_x)
+                Uc_pad_hat_x = self.copy_to_padded_x(fu*self.padsize**3, Uc_pad_hat_x)
                 
                 # Do first owned direction
-                Uc_pad_hat_x[:] = ifft(Uc_pad_hat_x*self.padsize, overwrite_input=True, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_x[:] = ifft(Uc_pad_hat_x, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
@@ -972,7 +975,7 @@ class R2CX(R2CY):
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_x, self.P1)
                 Uc_pad_hat_xy2 = self.copy_to_padded_y(Uc_pad_hat_y, Uc_pad_hat_xy2)
                 
-                Uc_pad_hat_xy[:] = ifft(Uc_pad_hat_xy2*self.padsize, overwrite_input=True, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_xy = ifft(Uc_pad_hat_xy2, Uc_pad_hat_xy, overwrite_input=True, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                     
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
@@ -982,7 +985,7 @@ class R2CX(R2CY):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                         
                 # Do ifft for z-direction
-                u = irfft(Uc_pad_hat_z2*self.padsize, u, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Uc_pad_hat_z2, u, overwrite_input=True, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
             
             elif self.communication == 'Swap':
                 Uc_pad_hat_y_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2[2]/2), self.complex, 0)]
@@ -998,10 +1001,10 @@ class R2CX(R2CY):
                 xy_plane  = xy_plane_T.transpose((1, 0))
                 xy_recv   = self.work_arrays[((int(self.padsize*self.N2[1]), int(self.padsize*self.N1[0])), self.complex, 0)]
 
-                Uc_pad_hat_x = self.copy_to_padded_x(fu, Uc_pad_hat_x)
+                Uc_pad_hat_x = self.copy_to_padded_x(fu*self.padsize**3, Uc_pad_hat_x)
                 
                 # Do first owned direction
-                Uc_pad_hat_x = ifft(Uc_pad_hat_x*self.padsize, Uc_pad_hat_x, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_x[:] = ifft(Uc_pad_hat_x, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
@@ -1011,7 +1014,7 @@ class R2CX(R2CY):
                 
                 Uc_pad_hat_xy2 = self.copy_to_padded_y(Uc_pad_hat_y2, Uc_pad_hat_xy2)
                 
-                Uc_pad_hat_xy2 = ifft(Uc_pad_hat_xy2*self.padsize, Uc_pad_hat_xy2, overwrite_input=True, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_xy2[:] = ifft(Uc_pad_hat_xy2, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                 xy_plane[:] = Uc_pad_hat_xy2[:, :, -1]
                     
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
@@ -1025,7 +1028,7 @@ class R2CX(R2CY):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                 
                 # Do ifft for z-direction
-                u = irfft(Uc_pad_hat_z2*self.padsize, u, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Uc_pad_hat_z2, u, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
                 
             elif self.communication == 'Alltoallw':
                 if len(self._subarrays1A_pad) == 0:
@@ -1035,10 +1038,10 @@ class R2CX(R2CY):
                 Uc_pad_hat_y  = self.work_arrays[((int(self.padsize*self.N1[0]), self.N[1], self.N2f), self.complex, 0)]
                 Uc_pad_hat_xy = self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2f), self.complex, 0)]
                 
-                Uc_pad_hat_x = self.copy_to_padded_x(fu, Uc_pad_hat_x)
+                Uc_pad_hat_x = self.copy_to_padded_x(fu*self.padsize**3, Uc_pad_hat_x)
                 
                 # Do first owned direction
-                Uc_pad_hat_x[:] = ifft(Uc_pad_hat_x*self.padsize, overwrite_input=True, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_x[:] = ifft(Uc_pad_hat_x, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                 
                 self.comm0.Alltoallw(
                     [Uc_pad_hat_x, self._counts_displs1, self._subarrays1A_pad],
@@ -1046,7 +1049,7 @@ class R2CX(R2CY):
                 
                 Uc_pad_hat_xy = self.copy_to_padded_y(Uc_pad_hat_y, Uc_pad_hat_xy)
                 
-                Uc_pad_hat_xy = ifft(Uc_pad_hat_xy*self.padsize, Uc_pad_hat_xy, overwrite_input=True, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+                Uc_pad_hat_xy[:] = ifft(Uc_pad_hat_xy, axis=1, threads=self.threads, planner_effort=self.planner_effort['ifft'])
                     
                 self.comm1.Alltoallw(
                     [Uc_pad_hat_xy, self._counts_displs2, self._subarrays2A_pad],
@@ -1055,7 +1058,7 @@ class R2CX(R2CY):
                 Uc_pad_hat_z2 = self.copy_to_padded_z(Uc_pad_hat_z, Uc_pad_hat_z2)
                 
                 # Do ifft for z-direction
-                u = irfft(Uc_pad_hat_z2*self.padsize, u, axis=2, threads=self.threads, planner_effort=self.planner_effort['irfft'])
+                u = irfft(Uc_pad_hat_z2, u, axis=2, overwrite_input=True, threads=self.threads, planner_effort=self.planner_effort['irfft'])
 
         return u
 
@@ -1183,7 +1186,7 @@ class R2CX(R2CY):
                 Uc_pad_hat_y  = Uc_pad_hat_y_T.transpose((1, 0, 2))
                 
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2 = rfft(u/padsize, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -1192,7 +1195,7 @@ class R2CX(R2CY):
                 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
-                Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy/padsize, Uc_pad_hat_xy2, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy, Uc_pad_hat_xy2, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 
                 Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy2, Uc_pad_hat_y)
                 
@@ -1201,8 +1204,9 @@ class R2CX(R2CY):
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])  
                                             
                 # Do fft for last direction 
-                Uc_pad_hat_x = fft(Uc_pad_hat_x/padsize, Uc_pad_hat_x, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_x[:] = fft(Uc_pad_hat_x, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 fu = self.copy_from_padded_x(Uc_pad_hat_x, fu)
+                fu /= padsize**3
             
             elif self.communication == 'Swap':
                 Uc_pad_hat_xy_T= self.work_arrays[((int(padsize*N[1]), int(padsize*N1[0]), N2[2]/2), self.complex, 0)]
@@ -1218,7 +1222,7 @@ class R2CX(R2CY):
                 xy_plane2 = self.work_arrays[((self.N[1]/2+1, int(self.padsize*self.N1[0])), self.complex, 0)]
                 
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2 = rfft(u/padsize, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -1230,7 +1234,7 @@ class R2CX(R2CY):
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
                 self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
-                Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy/padsize, Uc_pad_hat_xy2, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy, Uc_pad_hat_xy2, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 
                 Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy2, Uc_pad_hat_y)
                 
@@ -1255,9 +1259,10 @@ class R2CX(R2CY):
                 self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x2, self.mpitype])  
                                             
                 # Do fft for last direction 
-                Uc_pad_hat_x2 = fft(Uc_pad_hat_x2/padsize, Uc_pad_hat_x2, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_x2[:] = fft(Uc_pad_hat_x2, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 fu = self.copy_from_padded_x(Uc_pad_hat_x2, fu)
-            
+                fu /= padsize**3
+                
             elif self.communication == 'Alltoallw':
                 Uc_pad_hat_y  = self.work_arrays[((int(padsize*N1[0]), N[1], N2f), self.complex, 0)]
                 Uc_pad_hat_xy = self.work_arrays[((int(padsize*N1[0]), int(padsize*N[1]), N2f), self.complex, 0)]                
@@ -1268,7 +1273,7 @@ class R2CX(R2CY):
                      self._subarrays2B_pad, self._counts_displs1, self._counts_displs2) = self.get_subarrays(padsize=self.padsize)
                     
                 # Do fft in z direction on owned data
-                Uc_pad_hat_z2 = rfft(u/padsize, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
+                Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads, planner_effort=self.planner_effort['rfft'])
                 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
                 
@@ -1276,7 +1281,7 @@ class R2CX(R2CY):
                     [Uc_pad_hat_z, self._counts_displs2, self._subarrays2B_pad],
                     [Uc_pad_hat_xy, self._counts_displs2, self._subarrays2A_pad])
 
-                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy/padsize, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy, axis=1, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 
                 Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy, Uc_pad_hat_y)
                                 
@@ -1286,9 +1291,10 @@ class R2CX(R2CY):
                     [Uc_pad_hat_x, self._counts_displs1, self._subarrays1A_pad])
                 
                 # Do fft for last direction 
-                Uc_pad_hat_x[:] = fft(Uc_pad_hat_x/padsize, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
+                Uc_pad_hat_x[:] = fft(Uc_pad_hat_x, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
                 fu = self.copy_from_padded_x(Uc_pad_hat_x, fu)                
-            
+                fu /= padsize**3
+                
         return fu
 
 def R2C(N, L, MPI, precision, P1=None, communication="Swap", padsize=1.5, threads=1, alignment="X",
