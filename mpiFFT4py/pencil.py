@@ -759,7 +759,7 @@ class R2CX(R2CY):
     def __init__(self, N, L, MPI, precision, P1=None, communication='Swap', padsize=1.5, threads=1,
                  planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
         R2CY.__init__(self, N, L, MPI, precision, P1=P1, communication=communication, 
-                                       padsize=padsize, threads=threads, planner_effort=planner_effort)
+                      padsize=padsize, threads=threads, planner_effort=planner_effort)
         self.N2f = self.N2[2]/2 if self.comm1_rank < self.P2-1 else self.N2[2]/2+1
         if self.communication == 'Nyquist':
             self.N2f = self.N2[2]/2
@@ -1297,8 +1297,8 @@ class R2CX(R2CY):
                 
         return fu
 
-def R2C(N, L, MPI, precision, P1=None, communication="Swap", padsize=1.5, threads=1, alignment="X",
-                         planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
+def R2C(N, L, MPI, precision, P1=None, communication="Swap", padsize=1.5, threads=1, 
+        alignment="X", planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
     if alignment == 'X':
         return R2CX(N, L, MPI, precision, P1, communication, padsize, threads, planner_effort)
     else:

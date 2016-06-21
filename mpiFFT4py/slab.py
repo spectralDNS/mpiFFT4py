@@ -221,7 +221,7 @@ class R2C(object):
                 assert u.shape == self.real_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0, False)]
+                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
                 fu_padded[:self.N[0]/2, :self.N[1]/2, :self.Nf] = fu[:self.N[0]/2, :self.N[1]/2]
                 fu_padded[:self.N[0]/2, -self.N[1]/2:, :self.Nf] = fu[:self.N[0]/2, self.N[1]/2:]
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, :self.Nf] = fu[self.N[0]/2:, :self.N[1]/2]
@@ -577,7 +577,7 @@ class C2C(R2C):
                 assert u.shape == self.original_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = self.work_arrays[(u, 0, False)]
+                fu_padded = self.work_arrays[(u, 0)]
                 fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks] = fu[:self.N[0]/2, :self.N[1]/2]
                 fu_padded[:self.N[0]/2, -self.N[1]/2:, self.ks] = fu[:self.N[0]/2, self.N[1]/2:]
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, self.ks] = fu[self.N[0]/2:, :self.N[1]/2]
@@ -670,7 +670,7 @@ class C2C(R2C):
             else:
                 assert u.shape == self.original_shape_padded()
                 
-                fu_padded = self.work_arrays[(u, 0, False)]
+                fu_padded = self.work_arrays[(u, 0)]
                 fu_padded = fftn(u, fu_padded, axes=(0,1,2), threads=self.threads, planner_effort=self.planner_effort['fftn'])
                 
                 # Copy with truncation
