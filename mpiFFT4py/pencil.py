@@ -3,9 +3,9 @@ __date__ = "2016-02-16"
 __copyright__ = "Copyright (C) 2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from serialFFT import *
+from .serialFFT import *
 import numpy as np
-from mpibase import work_arrays, datatypes
+from .mpibase import work_arrays, datatypes
 from numpy.fft import fftfreq, rfftfreq
 from collections import defaultdict
 
