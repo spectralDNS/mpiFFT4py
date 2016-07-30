@@ -3,10 +3,10 @@ __date__ = "2016-02-16"
 __copyright__ = "Copyright (C) 2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
-from serialFFT import *
+from .serialFFT import *
 import numpy as np
-from mpibase import work_arrays, datatypes
-from cython.maths import dealias_filter, transpose_Uc, transpose_Umpi
+from .mpibase import work_arrays, datatypes
+from .cython.maths import dealias_filter, transpose_Uc, transpose_Umpi
 from collections import defaultdict
 
 #def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):

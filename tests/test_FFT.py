@@ -24,7 +24,7 @@ def FFT(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
     if request.param[:3] == "pen":
         communication = {"s": "Swap", "n": "Nyquist", "a": "Alltoallw"}[request.param[-3]]
-        alignment = string.upper(request.param[-2])
+        alignment = request.param[-2].upper()
         return Pencil_R2C(array([N, N, N]), L, MPI, prec, communication=communication, alignment=alignment)
     else:
         comm = 'alltoall' if request.param[-2] == 'a' else 'Alltoallw'
