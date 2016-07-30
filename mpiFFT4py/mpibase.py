@@ -47,7 +47,7 @@ except:
     def empty(N, dtype=np.float, bytes=None):
         return Empty(N, dtype=dtype)
 
-    def zeros(N, dtype=float64, bytes=None):
+    def zeros(N, dtype=np.float, bytes=None):
         return Zeros(N, dtype=dtype)
 
 class work_array_dict(dict):
