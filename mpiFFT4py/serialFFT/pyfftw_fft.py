@@ -4,19 +4,10 @@ __copyright__ = "Copyright (C) 2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
-           'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn', 
-           'fftfreq', 'rfftfreq', 'empty', 'zeros']
+           'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn']
 
 import pyfftw
-from numpy import iscomplexobj, zeros_like, float64, ascontiguousarray, zeros as npzeros
-from numpy.fft import fftfreq, rfftfreq
-import copy
-
-def empty(N, dtype=float64, bytes=32):
-    return pyfftw.n_byte_align_empty(N, bytes, dtype=dtype)
-
-def zeros(N, dtype=float64, bytes=32):
-    return pyfftw.n_byte_align(npzeros(N, dtype=dtype), bytes)
+from numpy import iscomplexobj
 
 dct_object    = {}
 fft_object    = {}

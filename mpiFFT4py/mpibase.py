@@ -7,12 +7,49 @@ import numpy as np
 from mpi4py import MPI
 import collections
 
+# Possible way to give numpy arrays attributes...
+#class Empty(np.ndarray):
+    #"""Numpy empty array with additional info dictionary to hold attributes
+    #"""
+    #def __new__(subtype, shape, dtype=np.float, info={}):
+        #obj = np.ndarray.__new__(subtype, shape, dtype)
+        #obj.info = info
+        #return obj
+
+    #def __array_finalize__(self, obj):
+        #if obj is None: return
+        #self.info = getattr(obj, 'info', {})
+
+#class Zeros(np.ndarray):
+    #"""Numpy zeros array with additional info dictionary to hold attributes
+    #"""
+    #def __new__(subtype, shape, dtype=float, info={}):
+        #obj = np.ndarray.__new__(subtype, shape, dtype)
+        #obj.fill(0)
+        #obj.info = info
+        #return obj
+
+    #def __array_finalize__(self, obj):
+        #if obj is None: return
+        #self.info = getattr(obj, 'info', {})
+
+Empty, Zeros = np.empty, np.zeros
+
 try:
-    from serialFFT.pyfftw_fft import zeros, empty
-    
+    import pyfftw
+    def empty(N, dtype=np.float, bytes=None):
+        return pyfftw.byte_align(Empty(N, dtype=dtype), n=bytes)
+
+    def zeros(N, dtype=np.float, bytes=None):
+        return pyfftw.byte_align(Zeros(N, dtype=dtype), n=bytes)
+        
 except:
-    zeros, empty = np.zeros, np.empty
-    
+    def empty(N, dtype=np.float, bytes=None):
+        return Empty(N, dtype=dtype)
+
+    def zeros(N, dtype=float64, bytes=None):
+        return Zeros(N, dtype=dtype)
+
 class work_array_dict(dict):
     """Dictionary of work arrays indexed by their shape, type and an indicator i."""
     def __missing__(self, key):

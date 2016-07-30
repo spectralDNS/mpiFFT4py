@@ -6,6 +6,7 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 from serialFFT import *
 import numpy as np
 from mpibase import work_arrays, datatypes
+from numpy.fft import fftfreq, rfftfreq
 from collections import defaultdict
 
 #__all__ = ['R2C']
@@ -211,17 +212,12 @@ class R2CY(object):
         else:
             return self.real_shape()
 
-    def real_local_slice(self, padded=False):
+    def real_local_slice(self, padsize=1):
         xzrank = self.comm0.Get_rank() # Local rank in xz-plane
         xyrank = self.comm1.Get_rank() # Local rank in xy-plane
-        if padded:
-            return (slice(int(self.padsize * xzrank * self.N1[0]), int(self.padsize * (xzrank+1) * self.N1[0]), 1),
-                    slice(int(self.padsize * xyrank * self.N2[1]), int(self.padsize * (xyrank+1) * self.N2[1]), 1),
-                    slice(0, int(self.padsize*self.N[2])))            
-        else:
-            return (slice(xzrank * self.N1[0], (xzrank+1) * self.N1[0], 1),
-                    slice(xyrank * self.N2[1], (xyrank+1) * self.N2[1], 1),
-                    slice(0, self.N[2]))
+        return (slice(int(padsize * xzrank * self.N1[0]), int(padsize * (xzrank+1) * self.N1[0]), 1),
+                slice(int(padsize * xyrank * self.N2[1]), int(padsize * (xyrank+1) * self.N2[1]), 1),
+                slice(0, int(padsize*self.N[2])))            
     
     def complex_local_slice(self):
         xzrank = self.comm0.Get_rank() # Local rank in xz-plane
@@ -783,17 +779,12 @@ class R2CX(R2CY):
         """A local intermediate shape of the complex data"""
         return (self.Np[0], self.num_processes, self.Np[1], self.Nf)
     
-    def real_local_slice(self, padded=False):
+    def real_local_slice(self, padsize=1):
         xyrank = self.comm0.Get_rank() # Local rank in xz-plane
         yzrank = self.comm1.Get_rank() # Local rank in xy-plane
-        if padded is False:
-            return (slice(xyrank * self.N1[0], (xyrank+1) * self.N1[0], 1),
-                    slice(yzrank * self.N2[1], (yzrank+1) * self.N2[1], 1),
-                    slice(0, self.N[2]))
-        else:
-            return (slice(int(self.padsize * xyrank * self.N1[0]), int(self.padsize * (xyrank+1) * self.N1[0]), 1),
-                    slice(int(self.padsize * yzrank * self.N2[1]), int(self.padsize * (yzrank+1) * self.N2[1]), 1),
-                    slice(0, int(self.padsize * self.N[2])))
+        return (slice(int(padsize * xyrank * self.N1[0]), int(padsize * (xyrank+1) * self.N1[0]), 1),
+                slice(int(padsize * yzrank * self.N2[1]), int(padsize * (yzrank+1) * self.N2[1]), 1),
+                slice(0, int(padsize * self.N[2])))
         
     def complex_local_slice(self):
         xyrank = self.comm0.Get_rank() # Local rank in xz-plane

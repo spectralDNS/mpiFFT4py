@@ -5,7 +5,8 @@ __license__  = "GNU Lesser GPL version 3 or any later version"
 
 from serialFFT import *
 import numpy as np
-from mpibase import work_arrays, datatypes
+from mpibase import work_arrays, datatypes, zeros, empty
+from numpy.fft import fftfreq, rfftfreq
 from collections import defaultdict
 
 def transpose_x(U_send, Uc_hatT, num_processes):
@@ -88,13 +89,10 @@ class R2C(object):
         """The local shape of the complex data"""
         return (self.N[0], self.N[1])    
 
-    def real_local_slice(self, padded=False):
-        if padded:
-            return (slice(int(self.padsize*self.rank*self.Np[0]), int(self.padsize*(self.rank+1)*self.Np[0]), 1),
-                    slice(0, int(self.padsize*self.N[1])))
-        else:
-            return (slice(self.rank*self.Np[0], (self.rank+1)*self.Np[0], 1),
-                    slice(0, self.N[1]))
+    def real_local_slice(self, padsize=1):
+        return (slice(int(padsize*self.rank*self.Np[0]), 
+                      int(padsize*(self.rank+1)*self.Np[0]), 1),
+                slice(0, int(padsize*self.N[1])))
     
     def complex_local_slice(self):
         return (slice(0, self.N[0]), 

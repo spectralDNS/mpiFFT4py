@@ -126,7 +126,7 @@ def test_FFT2_padded(FFT2):
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     
     c[:] = C[FFT.complex_local_slice()]
-    ae[:] = Ap[FFT.real_local_slice(padded=True)]
+    ae[:] = Ap[FFT.real_local_slice(padsize=1.5)]
     
     ap = zeros(FFT.real_shape_padded(), dtype=FFT.float)
     cp = zeros(FFT.complex_shape(), dtype=FFT.complex)
@@ -187,7 +187,7 @@ def test_FFT_padded(FFT):
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     
     c[:] = C[FFT.complex_local_slice()]
-    ae[:] = Ap[FFT.real_local_slice(padded=True)]
+    ae[:] = Ap[FFT.real_local_slice(padsize=1.5)]
     
     ap = zeros(FFT.real_shape_padded(), dtype=FFT.float)
     cp = zeros(FFT.complex_shape(), dtype=FFT.complex)
@@ -246,7 +246,7 @@ def test_FFT_C2C(FFT_C2C):
     
     # Get the single processor solution on local part of the solution
     ae = zeros(FFT.original_shape_padded(), dtype=FFT.complex)
-    ae[:] = Ap[FFT.original_local_slice(padded=True)]    
+    ae[:] = Ap[FFT.original_local_slice(padsize=1.5)]    
     c = zeros(FFT.transformed_shape(), dtype=FFT.complex)    
     c[:] = C[FFT.transformed_local_slice()]
     

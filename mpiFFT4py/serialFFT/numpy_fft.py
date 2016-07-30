@@ -4,11 +4,9 @@ __copyright__ = "Copyright (C) 2016 " + __author__
 __license__  = "GNU Lesser GPL version 3 or any later version"
 
 __all__ = ['dct', 'fft', 'ifft', 'fft2', 'ifft2', 'fftn', 'ifftn',
-           'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn', 
-           'fftfreq', 'rfftfreq', 'empty', 'zeros']
+           'rfft', 'irfft', 'rfft2', 'irfft2', 'rfftn', 'irfftn']
 
-from numpy import empty, zeros, iscomplexobj
-from numpy.fft import fftfreq, rfftfreq
+from numpy import iscomplexobj
 import numpy.fft
 from scipy.fftpack import dct
 
