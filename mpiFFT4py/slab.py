@@ -1,3 +1,15 @@
+"""Slab decomposition
+
+This module contains classes for performing FFTs with slab decomposition
+of three-dimensional data structures data[Nx, Ny, Nz], where (Nx, Ny, Nz) is 
+the shape of the input data. With slab decomposition only one of these three 
+indices is shared, leading to local datastructures on each processor
+with shape data[Nx/P, Ny, Nz], where P is the total number of processors.
+
+classes:
+    R2C - For real to complex transforms
+    C2C - For complex to complex transforms
+"""
 __author__ = "Mikael Mortensen <mikaem@math.uio.no>"
 __date__ = "2016-02-16"
 __copyright__ = "Copyright (C) 2016 " + __author__
@@ -7,18 +19,8 @@ from .serialFFT import *
 import numpy as np
 from .mpibase import work_arrays, datatypes
 from numpy.fft import fftfreq, rfftfreq
-from .cython.maths import dealias_filter, transpose_Uc, transpose_Umpi
+from .cython.maths import dealias_filter, transpose_Uc #, transpose_Umpi
 from collections import defaultdict
-
-#def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
-    #for i in xrange(num_processes):
-        #Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
-    #return Uc_hatT
-
-#def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
-    #for i in xrange(num_processes):
-        #U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
-    #return U_mpi
 
 # Using Lisandro Dalcin's code for Alltoallw.
 # Note that _subsize and _distribution are only really required for
@@ -58,9 +60,7 @@ class R2C(object):
         planner_effort - Planner effort used by FFTs (e.g., "FFTW_MEASURE", "FFTW_PATIENT", "FFTW_EXHAUSTIVE")
                          Give as defaultdict, with keys representing transform (e.g., fft, ifft)
 
-
     The transform is real to complex
-
     """
     def __init__(self, N, L, MPI, precision,
                  communication="Alltoallw",
@@ -70,7 +70,7 @@ class R2C(object):
         assert len(L) == 3
         assert len(N) == 3
         self.N = N
-        self.Nf = Nf = N[2]/2+1          # Independent complex wavenumbers in z-direction
+        self.Nf = N[2]/2+1          # Independent complex wavenumbers in z-direction
         self.Nfp = int(padsize*N[2]/2+1) # Independent complex wavenumbers in z-direction for padded array
         self.MPI = MPI
         self.comm = comm = MPI.COMM_WORLD
@@ -78,7 +78,7 @@ class R2C(object):
         self.communication = communication
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()
-        self.Np = Np = N / self.num_processes
+        self.Np = N / self.num_processes
         self.L = L.astype(self.float)
         self.dealias = np.zeros(0)
         self.padsize = padsize
@@ -130,17 +130,23 @@ class R2C(object):
             return self.real_shape()
 
     def real_local_slice(self, padsize=1):
+        """Local slice in real space of the input array
+        
+        Array can be padded with padsize > 1
+        """
         return (slice(int(padsize*self.rank*self.Np[0]),
                       int(padsize*(self.rank+1)*self.Np[0]), 1),
                 slice(0, int(padsize*self.N[1]), 1),
                 slice(0, int(padsize*self.N[2]), 1))
 
     def complex_local_slice(self):
+        """Local slice of complex return array"""
         return (slice(0, self.N[0], 1),
                 slice(self.rank*self.Np[1], (self.rank+1)*self.Np[1], 1),
                 slice(0, self.Nf, 1))
 
     def complex_local_wavenumbers(self):
+        """Returns local wavenumbers of complex space"""
         return (fftfreq(self.N[0], 1./self.N[0]),
                 fftfreq(self.N[1], 1./self.N[1])[self.complex_local_slice()[1]],
                 rfftfreq(self.N[2], 1./self.N[2]))
@@ -181,6 +187,7 @@ class R2C(object):
         return dealias
 
     def get_subarrays(self, padsize=1):
+        """Subarrays for Alltoallw transforms"""
         datatype = self.MPI._typedict[np.dtype(self.complex).char]
         _subarraysA = [
             datatype.Create_subarray([int(padsize*self.N[0]), self.Np[1], self.Nf], [l, self.Np[1], self.Nf], [s, 0, 0]).Commit()
@@ -330,20 +337,16 @@ class R2C(object):
         """fft in three directions using mpi
 
         dealias = "3/2-rule"
-            - Truncated transform with 3/2-rule. The transfored fu is truncated
+            - Truncated transform with 3/2-rule. The transformed fu is truncated
               when copied to complex space of complex_shape()
             - fu is of complex_shape()
             - u is of real_shape_padded()
 
-        dealias = "2/3-rule"
+        dealias = "2/3-rule" or None
             - Regular transform
             - fu is of complex_shape()
             - u is of real_shape()
 
-        dealias = None
-            - Regular transform
-            - fu is of complex_shape()
-            - u is of real_shape()
         """
         assert dealias in ('3/2-rule', '2/3-rule', 'None', None)
 
@@ -605,9 +608,9 @@ class C2C(R2C):
                 fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks] = fu[:self.N[0]/2, :self.N[1]/2]
                 fu_padded[:self.N[0]/2, -self.N[1]/2:, self.ks] = fu[:self.N[0]/2, self.N[1]/2:]
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, self.ks] = fu[self.N[0]/2:, :self.N[1]/2]
-                fu_padded[-self.N[0]/2:, -self.N[1]/2:, self.ks] = fu[self.N[0]/2:, self.N[1]/2:]                                
-                u = ifftn(fu_padded*self.padsize**3, u, overwrite_input=True, 
-                          axes=(0, 1, 2), threads=self.threads, 
+                fu_padded[-self.N[0]/2:, -self.N[1]/2:, self.ks] = fu[self.N[0]/2:, self.N[1]/2:]
+                u = ifftn(fu_padded*self.padsize**3, u, overwrite_input=True,
+                          axes=(0, 1, 2), threads=self.threads,
                           planner_effort=self.planner_effort['ifftn'])
 
             return u
@@ -622,7 +625,7 @@ class C2C(R2C):
             Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
 
             # Do first owned direction
-            Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads, 
+            Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads,
                           planner_effort=self.planner_effort['ifft'])
 
             if self.communication == 'alltoall':
@@ -655,7 +658,7 @@ class C2C(R2C):
             Upad_hat[:] = ifft(Upad_hat, axis=0, threads=self.threads,
                                planner_effort=self.planner_effort['ifft'])
 
-            # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir and z-direction of full size)            
+            # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir and z-direction of full size)
             self.comm.Alltoall([Upad_hat, self.mpitype], [U_mpi, self.mpitype])
 
             # Transpose data and pad in y-direction before doing ifft. Now data is padded in x and y
@@ -796,3 +799,14 @@ class C2C(R2C):
             fu[:, N[1]/2:, N[2]/2:] = fp[:, -N[1]/2:, -N[2]/2:]
 
         return fu
+
+
+#def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
+    #for i in xrange(num_processes):
+        #Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+    #return Uc_hatT
+
+#def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
+    #for i in xrange(num_processes):
+        #U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+    #return U_mpi
