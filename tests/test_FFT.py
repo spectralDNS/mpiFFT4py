@@ -15,6 +15,7 @@ from mpiFFT4py.slab import C2C
 N = 2**6
 L = array([2*pi, 2*pi, 2*pi])
 ks = (fftfreq(N)*N).astype(int)
+comm = MPI.COMM_WORLD
 
 @pytest.fixture(params=("pencilsys", "pencilsyd", "pencilnys", "pencilnyd", 
                         "pencilsxd", "pencilsxs", "pencilnxd", "pencilnxs", 
@@ -25,21 +26,21 @@ def FFT(request):
     if request.param[:3] == "pen":
         communication = {"s": "Swap", "n": "Nyquist", "a": "Alltoallw"}[request.param[-3]]
         alignment = request.param[-2].upper()
-        return Pencil_R2C(array([N, N, N]), L, MPI, prec, communication=communication, alignment=alignment)
+        return Pencil_R2C(array([N, N, N]), L, comm, prec, communication=communication, alignment=alignment)
     else:
-        comm = 'alltoall' if request.param[-2] == 'a' else 'Alltoallw'
-        return Slab_R2C(array([N, N, N]), L, MPI, prec, communication=comm)
+        communication = 'alltoall' if request.param[-2] == 'a' else 'Alltoallw'
+        return Slab_R2C(array([N, N, N]), L, comm, prec, communication=communication)
         
 @pytest.fixture(params=("lines", "lined"), scope='module')
 def FFT2(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
-    return Line_R2C(array([N, N]), L[:-1], MPI, prec)
+    return Line_R2C(array([N, N]), L[:-1], comm, prec)
 
 
 @pytest.fixture(params=("slabd", "slabs"), scope='module')
 def FFT_C2C(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
-    return C2C(array([N, N, N]), L, MPI, prec)
+    return C2C(array([N, N, N]), L, comm, prec)
     
 #@profile    
 def test_FFT(FFT):
@@ -235,7 +236,7 @@ def test_FFT_C2C(FFT_C2C):
         Ap = ifftn(Cp*1.5**3, Ap, axes=(0,1,2))
         
     else:
-        C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
+        C = zeros(FFT.global_shape(), dtype=FFT.complex)
         Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.complex)
         A = zeros(N, dtype=FFT.complex)
         

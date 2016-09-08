@@ -8,6 +8,7 @@ import numpy as np
 from .mpibase import work_arrays, datatypes, zeros, empty
 from numpy.fft import fftfreq, rfftfreq
 from collections import defaultdict
+from mpi4py import MPI
 
 def transpose_x(U_send, Uc_hatT, num_processes):
     sx = U_send.shape
@@ -44,20 +45,19 @@ class R2C(object):
     Args:
         N - NumPy array([Nx, Ny]) Number of nodes for the real mesh
         L - NumPy array([Lx, Ly]) The actual size of the real mesh
-        MPI - The MPI object (from mpi4py import MPI)
+        comm - The MPI communicator object
         precision - "single" or "double"
         padsize - For performing transforms with padding
         
     """
     
-    def __init__(self, N, L, MPI, precision, padsize=1.5, threads=1, 
+    def __init__(self, N, L, comm, precision, padsize=1.5, threads=1, 
                  planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
         self.N = N         # The global size of the problem
         self.L = L
         assert len(L) == 2
         assert len(N) == 2
-        self.MPI = MPI
-        self.comm = comm = MPI.COMM_WORLD
+        self.comm = comm
         self.float, self.complex, self.mpitype = float, complex, mpitype = datatypes(precision)
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()
@@ -202,7 +202,7 @@ class R2C(object):
             U_send = transpose_x(U_send, Uc_hatT, self.num_processes)
                     
             # Communicate all values
-            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
+            self.comm.Alltoall(MPI.IN_PLACE, [U_send, self.mpitype])
             
             Uc = fft(U_sendr, Uc, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
             fu[:, :self.Np[1]/2] = Uc
@@ -234,7 +234,7 @@ class R2C(object):
             U_send = transpose_x(U_send, fu_padded_xy2, self.num_processes)
                     
             # Communicate all values
-            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
+            self.comm.Alltoall(MPI.IN_PLACE, [U_send, self.mpitype])
             
             U_sendr = fft(U_sendr/self.padsize, U_sendr, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
             
@@ -284,7 +284,7 @@ class R2C(object):
             Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])    
             U_sendr[:] = Uc_hat[:, :self.Np[1]/2]
 
-            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
+            self.comm.Alltoall(MPI.IN_PLACE, [U_send, self.mpitype])
 
             Uc_hatT = transpose_y(Uc_hatT, U_sendr, self.num_processes)
             
@@ -312,7 +312,7 @@ class R2C(object):
             
             U_sendr[:] = fu_padded_x[:, :self.Np[1]/2]
 
-            self.comm.Alltoall(self.MPI.IN_PLACE, [U_send, self.mpitype])
+            self.comm.Alltoall(MPI.IN_PLACE, [U_send, self.mpitype])
 
             Uc_hatT = transpose_y(Uc_hatT, U_sendr, self.num_processes)
             

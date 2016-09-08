@@ -21,7 +21,7 @@ L = array([2*pi, 2*pi, 2*pi], dtype=float)
 # physical space is shared amongst the processors, whereas in wavenumber space the second 
 # index is shared.
 #FFT = R2C(N, L, MPI, "double", None, alignment='Y')
-FFT = R2C(N, L, MPI, "double", communication='alltoall')
+FFT = R2C(N, L, MPI.COMM_WORLD, "double", communication='alltoall')
 
 U = random.random(FFT.real_shape()).astype(FFT.float) # real_shape = (N[0]/comm.Get_size(), N[1], N[2])
 U_hat = zeros(FFT.complex_shape(), dtype=FFT.complex) # complex_shape = (N[0], N[1]//comm.Get_size(), N[2]/2+1)

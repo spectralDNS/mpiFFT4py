@@ -16,7 +16,7 @@ classes:
         Args:
         N - NumPy array([Nx, Ny, Nz]) setting the dimensions of the real mesh
         L - NumPy array([Lx, Ly, Lz]) size of the computational domain
-        MPI - The MPI object (from mpi4py import MPI)
+        comm - The MPI communicator object 
         precision - "single" or "double"
         communication - Communication scheme ('Nyquist', 'Swap' or 'Alltoallw')
         padsize - The size of padding, if padding is used in transforms
@@ -28,7 +28,7 @@ classes:
         Args:
         N - NumPy array([Nx, Ny, Nz]) number of nodes for the real mesh
         L - NumPy array([Lx, Ly, Lz]) size of the computational domain
-        MPI - The MPI object (from mpi4py import MPI)
+        comm - The MPI communicator object
         precision - "single" or "double"
         P1 - Decomposition along first dimension
         communication - Communication scheme ('Nyquist', 'Swap' or 'Alltoallw')
@@ -43,7 +43,7 @@ function:
     Args:
         N - NumPy array([Nx, Ny, Nz]) number of nodes for the real mesh
         L - NumPy array([Lx, Ly, Lz]) size of the computational domain
-        MPI - The MPI object (from mpi4py import MPI)
+        comm - The MPI communicator object
         precision - "single" or "double"
         P1 - Decomposition along first dimension
         communication - Communication scheme ('Nyquist', 'Swap' or 'Alltoallw')
@@ -64,6 +64,7 @@ import numpy as np
 from .mpibase import work_arrays, datatypes
 from numpy.fft import fftfreq, rfftfreq
 from collections import defaultdict
+from mpi4py import MPI
 
 #__all__ = ['R2C']
 
@@ -147,7 +148,7 @@ class R2CY(object):
     Args:
         N - NumPy array([Nx, Ny, Nz]) Number of nodes for the real mesh
         L - NumPy array([Lx, Ly, Lz]) The actual size of the computational domain
-        MPI - The MPI object (from mpi4py import MPI)
+        comm - The MPI communicator object
         precision - "single" or "double"
         P1 - Decomposition along first dimension
         communication - Communication scheme ('Nyquist', 'Swap' or 'Alltoallw')
@@ -161,14 +162,13 @@ class R2CY(object):
 
     """
 
-    def __init__(self, N, L, MPI, precision, P1=None, communication='Alltoallw', padsize=1.5, threads=1,
+    def __init__(self, N, L, comm, precision, P1=None, communication='Alltoallw', padsize=1.5, threads=1,
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE")):
         self.N = N
         assert len(L) == 3
         assert len(N) == 3
         self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction
-        self.MPI = MPI
-        self.comm = comm = MPI.COMM_WORLD
+        self.comm = comm
         self.float, self.complex, self.mpitype = float, complex, mpitype = datatypes(precision)
         self.num_processes = comm.Get_size()
         assert self.num_processes > 1
@@ -214,7 +214,7 @@ class R2CY(object):
         self._counts_displs2 = None
 
     def get_subarrays(self, padsize=1):
-        datatype = self.MPI._typedict[np.dtype(self.complex).char]
+        datatype = MPI._typedict[np.dtype(self.complex).char]
         M, N, Q = self.N[0], self.N[1], self.Nf
         m = _subsize(M, self.P2, self.comm1_rank)
         n = _subsize(int(padsize*N), self.P2, self.comm1_rank)
@@ -357,9 +357,10 @@ class R2CY(object):
         fu[:, self.N[1]/2:] = fp[:, -self.N[1]/2:]
         return fu
 
-    def global_complex_shape(self):
+    def global_complex_shape(self, padsize=1.0):
         """Global size of problem in complex wavenumber space"""
-        return (self.N[0], self.N[1], self.Nf)
+        return (int(padsize*self.N[0]), int(padsize*self.N[1]),
+                int(padsize*self.N[2]/2+1))
 
     def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
@@ -391,12 +392,12 @@ class R2CY(object):
                 Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, self.P2)
                     
                 # Communicate in xz-plane and do fft in x-direction
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_x[:] = ifft(Uc_hat_x, axis=0, threads=self.threads, 
                                    planner_effort=self.planner_effort['ifft'])
 
                 # Communicate and transform in xy-plane
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_x, self.P1)
 
                 # Do fft for z-direction
@@ -419,14 +420,14 @@ class R2CY(object):
                 Uc_hat_xp = transform_Uc_xy(Uc_hat_xp, Uc_hat_y, self.P2)
 
                 # Communicate in xz-plane and do fft in x-direction
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_xp, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_xp, self.mpitype])
                 Uc_hat_xp[:] = ifft(Uc_hat_xp, axis=0, threads=self.threads,
                                     planner_effort=self.planner_effort['ifft'])
 
                 Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]/2]
 
                 # Communicate and transform in xy-plane all but k=N/2
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_x, self.P1)
 
                 xy_plane[:] = Uc_hat_xp[:, :, -1]
@@ -486,7 +487,7 @@ class R2CY(object):
                 Uc_pad_hat_x = transform_Uc_xy(Uc_pad_hat_x, Uc_pad_hat_y, self.P2)
 
                 # Communicate in xz-plane
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
 
                 # Pad and do fft in x-direction
                 Uc_pad_hat_xy = self.copy_to_padded_x(Uc_pad_hat_x, Uc_pad_hat_xy)
@@ -494,7 +495,7 @@ class R2CY(object):
                                         planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xy-plane
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
 
                 # Transform
                 Uc_pad_hat_z[:] = transform_Uc_zx(Uc_pad_hat_z, Uc_pad_hat_xy, self.P1)
@@ -526,7 +527,7 @@ class R2CY(object):
                 Uc_pad_hat_xr2[:] = transform_Uc_xy(Uc_pad_hat_xr2, Uc_pad_hat_y, self.P2)
 
                 # Communicate in xz-plane and do fft in x-direction
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xr2, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xr2, self.mpitype])
 
                 # Pad and do fft in x-direction
                 Uc_pad_hat_xy3 = self.copy_to_padded_x(Uc_pad_hat_xr2, Uc_pad_hat_xy3)
@@ -536,7 +537,7 @@ class R2CY(object):
                 Uc_pad_hat_xy[:] = Uc_pad_hat_xy3[:, :, :N1[2]/2]
 
                 # Communicate and transform in xy-plane all but k=N/2
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
 
                 Uc_pad_hat_z[:] = transform_Uc_zx(Uc_pad_hat_z, Uc_pad_hat_xy, self.P1)
 
@@ -612,12 +613,12 @@ class R2CY(object):
                 Uc_hat_x = transform_Uc_xz(Uc_hat_x, Uc_hat_z, self.P1)
 
                 # Communicate and do fft in x-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_x[:] = fft(Uc_hat_x, axis=0, threads=self.threads,
                                   planner_effort=self.planner_effort['fft'])
 
                 # Communicate and transform to final y-direction
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_y[:] = transform_Uc_yx(Uc_hat_y, Uc_hat_x, self.P2)
 
                 # Do fft for last direction
@@ -644,7 +645,7 @@ class R2CY(object):
                 Uc_hat_x = transform_Uc_xz(Uc_hat_x, Uc_hat_z, self.P1)
 
                 # Communicate and do fft in x-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_x[:] = fft(Uc_hat_x, axis=0, threads=self.threads,
                                   planner_effort=self.planner_effort['fft'])
                 Uc_hat_xr2[:, :, :N1[2]/2] = Uc_hat_x[:]
@@ -664,7 +665,7 @@ class R2CY(object):
                     Uc_hat_xr2[:, :, -1] = xy_plane
 
                 # Communicate and transform to final y-direction
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_xr2, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_xr2, self.mpitype])
                 Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr2, self.P2)
 
                 # Do fft for last direction
@@ -722,14 +723,14 @@ class R2CY(object):
                 Uc_pad_hat_xy = transform_Uc_xz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P1)
 
                 # Communicate and do fft in x-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
                 Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy, axis=0, threads=self.threads,
                                        planner_effort=self.planner_effort['fft'])
 
                 Uc_pad_hat_x = self.copy_from_padded_x(Uc_pad_hat_xy, Uc_pad_hat_x)
 
                 # Communicate and transform to final y-direction
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_x, self.P2)
 
                 # Do fft for last direction
@@ -759,7 +760,7 @@ class R2CY(object):
                 Uc_pad_hat_xy[:] = transform_Uc_xz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P1)
 
                 # Communicate and do fft in x-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
                 Uc_pad_hat_xy[:] = fft(Uc_pad_hat_xy, axis=0, threads=self.threads,
                                        planner_effort=self.planner_effort['fft'])
 
@@ -782,7 +783,7 @@ class R2CY(object):
                     Uc_pad_hat_xr2[:, :, -1] = xy_pad_plane
 
                 # Communicate and transform to final y-direction
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xr2, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xr2, self.mpitype])
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_xr2, self.P2)
 
                 # Do fft for last direction
@@ -844,10 +845,10 @@ class R2CX(R2CY):
 
     This version has the final complex data aligned in the x-direction
     """
-    def __init__(self, N, L, MPI, precision, P1=None, communication='Swap',
+    def __init__(self, N, L, comm, precision, P1=None, communication='Swap',
                  padsize=1.5, threads=1,
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE")):
-        R2CY.__init__(self, N, L, MPI, precision, P1=P1, communication=communication,
+        R2CY.__init__(self, N, L, comm, precision, P1=P1, communication=communication,
                       padsize=padsize, threads=threads, planner_effort=planner_effort)
         self.N2f = self.N2[2]/2 if self.comm1_rank < self.P2-1 else self.N2[2]/2+1
         if self.communication == 'Nyquist':
@@ -913,7 +914,7 @@ class R2CX(R2CY):
         return K
 
     def get_subarrays(self, padsize=1):
-        datatype = self.MPI._typedict[np.dtype(self.complex).char]
+        datatype = MPI._typedict[np.dtype(self.complex).char]
         M, N, Q = self.N[0], self.N[1], self.Nf
         m = _subsize(int(padsize*M), self.P1, self.comm0_rank)
         n = _subsize(N, self.P1, self.comm0_rank)
@@ -969,7 +970,7 @@ class R2CX(R2CY):
                                 planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
 
                 # Transform to y all but k=N/2 (the neglected Nyquist mode)
                 Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_x, self.P1)
@@ -977,7 +978,7 @@ class R2CX(R2CY):
                                    planner_effort=self.planner_effort['ifft'])
 
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
                 Uc_hat_z[:] = transform_Uc_zy(Uc_hat_z, Uc_hat_y, self.P2)
 
                 # Do ifft for z-direction
@@ -998,7 +999,7 @@ class R2CX(R2CY):
                                 planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
 
                 # Transform to y all but k=N/2 (the neglected Nyquist mode)
                 Uc_hat_y2 = transform_Uc_yx(Uc_hat_y2, Uc_hat_x, self.P1)
@@ -1008,7 +1009,7 @@ class R2CX(R2CY):
 
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
                 Uc_hat_y[:] = Uc_hat_y2[:, :, :self.N2[2]/2]
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
                 Uc_hat_z = transform_Uc_zy(Uc_hat_z, Uc_hat_y, self.P2)
 
                 self.comm1.Scatter(xy_plane_T, xy_recv, root=self.P2-1)
@@ -1063,7 +1064,7 @@ class R2CX(R2CY):
                                        planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
 
                 # Transform to y
                 Uc_pad_hat_y = transform_Uc_yx(Uc_pad_hat_y, Uc_pad_hat_x, self.P1)
@@ -1073,7 +1074,7 @@ class R2CX(R2CY):
                                      planner_effort=self.planner_effort['ifft'])
 
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
                 Uc_pad_hat_z[:] = transform_Uc_zy(Uc_pad_hat_z, Uc_pad_hat_xy, self.P2)
                 Uc_pad_hat_z[:, :, -1] = 0
 
@@ -1104,7 +1105,7 @@ class R2CX(R2CY):
                                        planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
 
                 # Transform to y
                 Uc_pad_hat_y2 = transform_Uc_yx(Uc_pad_hat_y2, Uc_pad_hat_x, self.P1)
@@ -1117,7 +1118,7 @@ class R2CX(R2CY):
 
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
                 Uc_pad_hat_xy[:] = Uc_pad_hat_xy2[:, :, :self.N2[2]/2]
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
                 Uc_pad_hat_z = transform_Uc_zy(Uc_pad_hat_z, Uc_pad_hat_xy, self.P2)
 
                 self.comm1.Scatter(xy_plane_T, xy_recv, root=self.P2-1)
@@ -1187,13 +1188,13 @@ class R2CX(R2CY):
                 Uc_hat_y = transform_Uc_yz(Uc_hat_y, Uc_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
                 Uc_hat_y2 = fft(Uc_hat_y, Uc_hat_y2, axis=1, threads=self.threads,
                                 planner_effort=self.planner_effort['fft'])
 
                 # Communicate and transform to final x-direction
                 Uc_hat_x = transform_Uc_xy(Uc_hat_x, Uc_hat_y2, self.P1)
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
 
                 # Do fft for last direction
                 fu = fft(Uc_hat_x, fu, axis=0, threads=self.threads,
@@ -1221,7 +1222,7 @@ class R2CX(R2CY):
                 Uc_hat_y = transform_Uc_yz(Uc_hat_y, Uc_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
                 Uc_hat_y3 = fft(Uc_hat_y, Uc_hat_y3, axis=1, threads=self.threads,
                                 planner_effort=self.planner_effort['fft'])
                 Uc_hat_y2[:, :, :self.N2[2]/2] = Uc_hat_y3[:]
@@ -1242,7 +1243,7 @@ class R2CX(R2CY):
 
                 # Communicate and transform to final x-direction
                 Uc_hat_x2 = transform_Uc_xy(Uc_hat_x2, Uc_hat_y2, self.P1)
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_hat_x2, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x2, self.mpitype])
 
                 # Do fft for last direction
                 fu = fft(Uc_hat_x2, fu, axis=0, threads=self.threads,
@@ -1304,7 +1305,7 @@ class R2CX(R2CY):
                 Uc_pad_hat_xy = transform_Uc_yz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
                 Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy, Uc_pad_hat_xy2, axis=1, threads=self.threads,
                                      planner_effort=self.planner_effort['fft'])
 
@@ -1312,7 +1313,7 @@ class R2CX(R2CY):
 
                 # Communicate and transform to final x-direction
                 Uc_pad_hat_x = transform_Uc_xy(Uc_pad_hat_x, Uc_pad_hat_y, self.P1)
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_x, self.mpitype])
 
                 # Do fft for last direction
                 Uc_pad_hat_x[:] = fft(Uc_pad_hat_x, axis=0, threads=self.threads,
@@ -1346,7 +1347,7 @@ class R2CX(R2CY):
                 Uc_pad_hat_xy = transform_Uc_yz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
-                self.comm1.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
+                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
                 Uc_pad_hat_xy2 = fft(Uc_pad_hat_xy, Uc_pad_hat_xy2, axis=1, threads=self.threads,
                                      planner_effort=self.planner_effort['fft'])
 
@@ -1370,7 +1371,7 @@ class R2CX(R2CY):
 
                 # Communicate and transform to final x-direction
                 Uc_pad_hat_x2 = transform_Uc_xy(Uc_pad_hat_x2, Uc_pad_hat_y2, self.P1)
-                self.comm0.Alltoall(self.MPI.IN_PLACE, [Uc_pad_hat_x2, self.mpitype])
+                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_x2, self.mpitype])
 
                 # Do fft for last direction
                 Uc_pad_hat_x2[:] = fft(Uc_pad_hat_x2, axis=0, threads=self.threads,
@@ -1415,9 +1416,9 @@ class R2CX(R2CY):
 
         return fu
 
-def R2C(N, L, MPI, precision, P1=None, communication="Swap", padsize=1.5, threads=1,
+def R2C(N, L, comm, precision, P1=None, communication="Swap", padsize=1.5, threads=1,
         alignment="X", planner_effort=defaultdict(lambda : "FFTW_MEASURE")):
     if alignment == 'X':
-        return R2CX(N, L, MPI, precision, P1, communication, padsize, threads, planner_effort)
+        return R2CX(N, L, comm, precision, P1, communication, padsize, threads, planner_effort)
     else:
-        return R2CY(N, L, MPI, precision, P1, communication, padsize, threads, planner_effort)
+        return R2CY(N, L, comm, precision, P1, communication, padsize, threads, planner_effort)

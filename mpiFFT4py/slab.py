@@ -21,6 +21,7 @@ from .mpibase import work_arrays, datatypes
 from numpy.fft import fftfreq, rfftfreq
 from .cython.maths import dealias_filter, transpose_Uc #, transpose_Umpi
 from collections import defaultdict
+from mpi4py import MPI
 
 # Using Lisandro Dalcin's code for Alltoallw.
 # Note that _subsize and _distribution are only really required for
@@ -52,7 +53,7 @@ class R2C(object):
     Args:
         N - NumPy array([Nx, Ny, Nz]) Number of nodes for the real mesh
         L - NumPy array([Lx, Ly, Lz]) The actual size of the real mesh
-        MPI - The MPI object (from mpi4py import MPI)
+        comm - The MPI communicator object
         precision - "single" or "double"
         communication - Method used for communication ('alltoall', 'Sendrecv_replace', 'Alltoallw')
         padsize - Padsize when dealias = 3/2-rule is used
@@ -62,7 +63,7 @@ class R2C(object):
 
     The transform is real to complex
     """
-    def __init__(self, N, L, MPI, precision,
+    def __init__(self, N, L, comm, precision,
                  communication="Alltoallw",
                  padsize=1.5,
                  threads=1,
@@ -72,8 +73,7 @@ class R2C(object):
         self.N = N
         self.Nf = N[2]/2+1          # Independent complex wavenumbers in z-direction
         self.Nfp = int(padsize*N[2]/2+1) # Independent complex wavenumbers in z-direction for padded array
-        self.MPI = MPI
-        self.comm = comm = MPI.COMM_WORLD
+        self.comm = comm
         self.float, self.complex, self.mpitype = datatypes(precision)
         self.communication = communication
         self.num_processes = comm.Get_size()
@@ -110,13 +110,10 @@ class R2C(object):
         """Global size of problem in real physical space"""
         return (self.N[0], self.N[1], self.N[2])
 
-    def global_complex_shape(self):
+    def global_complex_shape(self, padsize=1.):
         """Global size of problem in complex wavenumber space"""
-        return (self.N[0], self.N[1], self.Nf)
-
-    def global_complex_shape_padded(self):
-        """Global size of problem in complex wavenumber space"""
-        return (int(self.padsize*self.N[0]), int(self.padsize*self.N[1]), self.Nfp)
+        return (int(padsize*self.N[0]), int(padsize*self.N[1]),
+                int(padsize*self.N[2]/2+1))
 
     def work_shape(self, dealias):
         """Shape of work arrays used in convection with dealiasing.
@@ -188,7 +185,7 @@ class R2C(object):
 
     def get_subarrays(self, padsize=1):
         """Subarrays for Alltoallw transforms"""
-        datatype = self.MPI._typedict[np.dtype(self.complex).char]
+        datatype = MPI._typedict[np.dtype(self.complex).char]
         _subarraysA = [
             datatype.Create_subarray([int(padsize*self.N[0]), self.Np[1], self.Nf], [l, self.Np[1], self.Nf], [s, 0, 0]).Commit()
             for l, s in _distribution(int(padsize*self.N[0]), self.num_processes)
@@ -238,7 +235,7 @@ class R2C(object):
                 assert u.shape == self.real_shape_padded()
 
                 # First create padded complex array and then perform irfftn
-                fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
+                fu_padded = self.work_arrays[(self.global_complex_shape(padsize=1.5), self.complex, 0)]
                 fu_padded[:self.N[0]/2, :self.N[1]/2, :self.Nf] = fu[:self.N[0]/2, :self.N[1]/2]
                 fu_padded[:self.N[0]/2, -self.N[1]/2:, :self.Nf] = fu[:self.N[0]/2, self.N[1]/2:]
                 fu_padded[-self.N[0]/2:, :self.N[1]/2, :self.Nf] = fu[self.N[0]/2:, :self.N[1]/2]
@@ -272,7 +269,7 @@ class R2C(object):
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
                 Uc_hatT = transpose_Uc(Uc_hatT, Uc_mpi, self.num_processes, self.Np[1], self.Nf)
 
-                #self.comm.Alltoall(self.MPI.IN_PLACE, [Uc_hat, self.mpitype])
+                #self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 #Uc_hatT = np.rollaxis(Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf)), 1).reshape(self.complex_shape_T())
 
             elif self.communication == 'Sendrecv_replace':
@@ -310,7 +307,7 @@ class R2C(object):
 
             if not self.communication == 'Alltoallw':
                 # Communicate to distribute first dimension (like Fig. 2b but padded in x-dir)
-                self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat, self.mpitype])
+                self.comm.Alltoall(MPI.IN_PLACE, [Upad_hat, self.mpitype])
                 Upad_hat1[:] = np.rollaxis(Upad_hat.reshape(self.complex_shape_padded_0_I()), 1).reshape(Upad_hat1.shape)
 
             else:
@@ -359,7 +356,7 @@ class R2C(object):
             else:
                 assert u.shape == self.real_shape_padded()
 
-                fu_padded = self.work_arrays[(self.global_complex_shape_padded(),
+                fu_padded = self.work_arrays[(self.global_complex_shape(padsize=1.5),
                                               self.complex, 0, False)]
                 fu_padded = rfftn(u, fu_padded, axes=(0, 1, 2),
                                   planner_effort=self.planner_effort['rfftn'])
@@ -451,7 +448,7 @@ class R2C(object):
             if not self.communication == 'Alltoallw':
                 # Transpose and commuincate data
                 Upad_hat0[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1).reshape(Upad_hat0.shape)
-                self.comm.Alltoall(self.MPI.IN_PLACE, [Upad_hat0, self.mpitype])
+                self.comm.Alltoall(MPI.IN_PLACE, [Upad_hat0, self.mpitype])
 
             else:
                 if len(self._subarraysA_pad) == 0:
@@ -530,7 +527,7 @@ class C2C(R2C):
     Args:
         N - NumPy array([Nx, Ny, Nz]) Number of nodes for the real mesh
         L - NumPy array([Lx, Ly, Lz]) The actual size of the real mesh
-        MPI - The MPI object (from mpi4py import MPI)
+        comm - The MPI communicator object
         precision - "single" or "double"
         communication - Method used for communication ('alltoall', 'Sendrecv_replace')
         padsize - Padsize when dealias = 3/2-rule is used
@@ -540,12 +537,12 @@ class C2C(R2C):
 
     The transform is complex to complex
     """
-    def __init__(self, N, L, MPI, precision,
+    def __init__(self, N, L, comm, precision,
                  communication="alltoall",
                  padsize=1.5,
                  threads=1,
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE")):
-        R2C.__init__(self, N, L, MPI, precision,
+        R2C.__init__(self, N, L, comm, precision,
                      communication=communication,
                      padsize=padsize, threads=threads,
                      planner_effort=planner_effort)
@@ -557,10 +554,14 @@ class C2C(R2C):
         self.original_shape_padded = self.real_shape_padded
         self.original_shape = self.real_shape
         self.transformed_shape = self.complex_shape
-        self.global_shape = self.global_complex_shape
         self.original_local_slice = self.real_local_slice
         self.transformed_local_slice = self.complex_local_slice
         self.ks = (fftfreq(N[2])*N[2]).astype(int)
+
+    def global_shape(self, padsize=1.):
+        """Global size of problem in transformed space"""
+        return (int(padsize*self.N[0]), int(padsize*self.N[1]),
+                int(padsize*self.N[2]))
 
     def transformed_local_wavenumbers(self):
         return (fftfreq(self.N[0], 1./self.N[0]),

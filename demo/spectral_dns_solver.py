@@ -29,7 +29,7 @@ dt = 0.01
 N = array([2**5, 2**5, 2**5], dtype=int)
 L = array([2*pi, 2*pi, 2*pi], dtype=float)
 
-FFT = R2C(N, L, MPI, "double", planner_effort=
+FFT = R2C(N, L, MPI.COMM_WORLD, "double", planner_effort=
           defaultdict(lambda: 'FFTW_ESTIMATE', {'irfft2': 'FFTW_PATIENT'}))
 
 U = empty((3,) + FFT.real_shape())                        # real_shape = (N[0]/comm.Get_size(), N[1], N[2])

@@ -13,7 +13,6 @@ requirements:
     - python
     - cython
     - numpy
-    - gcc
 
   run:
     - python
