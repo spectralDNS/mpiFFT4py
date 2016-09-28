@@ -96,38 +96,33 @@ def test_FFT2(FFT2):
 
 def test_FFT2_padded(FFT2):
     FFT = FFT2
+    prec = "single" if isinstance(FFT.float, np.float32) else "double"
+    FFT_SELF = Line_R2C(FFT.N, FFT.L, MPI.COMM_SELF, prec)
+
     N = FFT.N
     if FFT.rank == 0:
         A = random(N).astype(FFT.float)
         C = zeros((FFT.global_complex_shape()), dtype=FFT.complex)
-        C = rfft2(A, C, axes=(0,1))
+        C = FFT_SELF.fft2(A, C)
         
         # Eliminate Nyquist, otherwise test will fail
         C[-N[0]/2] = 0
-        A = irfft2(C, A)
         
-        Cp = zeros((3*N[0]/2, 3*N[1]/4+1), dtype=FFT.complex)
-        Nf = N[1]/2+1
-        ks = (fftfreq(N[0], 1./N[0])).astype(int)
-        Cp[ks, :Nf] = C[:]
+        A_pad = np.zeros(FFT_SELF.real_shape_padded(), dtype=FFT.float)
+        A_pad = FFT_SELF.ifft2(C, A_pad, dealias="3/2-rule")
                 
-        Ap = zeros((3*N[0]/2, 3*N[1]/2), dtype=FFT.float)
-        Ap = irfft2(Cp*1.5**2, Ap, axes=(0,1))
-        
     else:
         C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
-        Ap = zeros((3*N[0]/2, 3*N[1]/2), dtype=FFT.float)
-        A = zeros(N, dtype=FFT.float)
+        A_pad = zeros(FFT_SELF.real_shape_padded(), dtype=FFT.float)
         
     FFT.comm.Bcast(C, root=0)
-    FFT.comm.Bcast(Ap, root=0)
-    FFT.comm.Bcast(A, root=0)
+    FFT.comm.Bcast(A_pad, root=0)
     
     ae = zeros(FFT.real_shape_padded(), dtype=FFT.float)
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     
     c[:] = C[FFT.complex_local_slice()]
-    ae[:] = Ap[FFT.real_local_slice(padsize=1.5)]
+    ae[:] = A_pad[FFT.real_local_slice(padsize=1.5)]
     
     ap = zeros(FFT.real_shape_padded(), dtype=FFT.float)
     cp = zeros(FFT.complex_shape(), dtype=FFT.complex)
@@ -147,10 +142,14 @@ def test_FFT2_padded(FFT2):
 
 def test_FFT_padded(FFT):
     N = FFT.N
+    prec = "single" if isinstance(FFT.float, np.float32) else "double"
+    FFT_SELF = Slab_R2C(FFT.N, L, MPI.COMM_SELF, prec,
+                        communication=FFT.communication)
+
     if FFT.rank == 0:
         A = random(N).astype(FFT.float)
         C = zeros((FFT.global_complex_shape()), dtype=FFT.complex)
-        C = rfftn(A, C, axes=(0,1,2))
+        C = FFT_SELF.fftn(A, C)
         
         # Eliminate Nyquist, otherwise test will fail
         C[-N[0]/2] = 0
@@ -158,37 +157,21 @@ def test_FFT_padded(FFT):
         if FFT.communication == 'Nyquist':
             C[:, :, -1] = 0  # Remove Nyquist frequency
         
-        A = irfftn(C, A)
-        
-        Cp = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/4+1), dtype=FFT.complex)
-        Nf = N[2]/2+1
-        ks = (fftfreq(N[1], 1./N[1])).astype(int)
-        Cp[:N[0]/2, ks, :Nf] = C[:N[0]/2]
-        Cp[-N[0]/2:, ks, :Nf] = C[N[0]/2:]
+        A_pad = np.zeros(FFT_SELF.real_shape_padded(), dtype=FFT.float)
+        A_pad = FFT_SELF.ifftn(C, A_pad, dealias='3/2-rule')
                 
-        # If Nyquist is retained then these are needed to symmetrize and pass test
-        Cp[-N[0]/2] *= 0.5
-        Cp[:, -N[1]/2] *= 0.5
-        Cp[N[0]/2] = Cp[-N[0]/2]
-        Cp[:, N[1]/2] = Cp[:, -N[1]/2]
-        
-        Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.float)
-        Ap = irfftn(Cp*1.5**3, Ap, axes=(0,1,2))
-        
     else:
         C = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
-        Ap = zeros((3*N[0]/2, 3*N[1]/2, 3*N[2]/2), dtype=FFT.float)
-        A = zeros(N, dtype=FFT.float)
+        A_pad = zeros(FFT_SELF.real_shape_padded(), dtype=FFT.float)
         
     FFT.comm.Bcast(C, root=0)
-    FFT.comm.Bcast(Ap, root=0)
-    FFT.comm.Bcast(A, root=0)
+    FFT.comm.Bcast(A_pad, root=0)
     
     ae = zeros(FFT.real_shape_padded(), dtype=FFT.float)
     c = zeros(FFT.complex_shape(), dtype=FFT.complex)
     
     c[:] = C[FFT.complex_local_slice()]
-    ae[:] = Ap[FFT.real_local_slice(padsize=1.5)]
+    ae[:] = A_pad[FFT.real_local_slice(padsize=1.5)]
     
     ap = zeros(FFT.real_shape_padded(), dtype=FFT.float)
     cp = zeros(FFT.complex_shape(), dtype=FFT.complex)

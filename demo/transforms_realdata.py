@@ -34,4 +34,6 @@ for i in range(10):
 U_copy = zeros_like(U)
 U_copy = FFT.ifftn(U_hat, U_copy)
 
-assert allclose(U, U_copy)
+tol = 1e-6 if FFT.float == float32 else 1e-10
+
+assert allclose(U, U_copy, tol, tol)
