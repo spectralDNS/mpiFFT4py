@@ -16,6 +16,16 @@ mpiFFT4py requires *numpy* for basic array oparations, [*pyfftw*](https://github
 To install in place do
 
     python setup.py build_ext --inplace
+    
+To install using Anaconda, you may either compile it yourselves using (from the main directory)
+
+    conda build conf/conda
+    conda install mpiFFT4py --use-local
+    
+or use precompiled binaries in the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud
+
+    conda config --add channels spectralDNS
+    conda install mpiFFT4py
 
 Authors
 -------
