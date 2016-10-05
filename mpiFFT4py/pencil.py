@@ -1,3 +1,4 @@
+from __future__ import division
 """Pencil decomposition
 
 This module contains classes for performing FFTs with pencil decomposition
@@ -16,7 +17,7 @@ classes:
         Args:
         N - NumPy array([Nx, Ny, Nz]) setting the dimensions of the real mesh
         L - NumPy array([Lx, Ly, Lz]) size of the computational domain
-        comm - The MPI communicator object 
+        comm - The MPI communicator object
         precision - "single" or "double"
         communication - Communication scheme ('Nyquist', 'Swap' or 'Alltoallw')
         padsize - The size of padding, if padding is used in transforms
@@ -167,7 +168,7 @@ class R2CY(object):
         self.N = N
         assert len(L) == 3
         assert len(N) == 3
-        self.Nf = N[2]/2+1 # Number of independent complex wavenumbers in z-direction
+        self.Nf = N[2]//2+1 # Number of independent complex wavenumbers in z-direction
         self.comm = comm
         self.float, self.complex, self.mpitype = float, complex, mpitype = datatypes(precision)
         self.num_processes = comm.Get_size()
@@ -184,18 +185,18 @@ class R2CY(object):
             self.P1, self.P2 = P1, P2
         else:
             self.P1 = P1
-            self.P2 = P2 = self.num_processes / P1
-        self.N1 = N / P1
-        self.N2 = N / P2
+            self.P2 = P2 = self.num_processes // P1
+        self.N1 = N // P1
+        self.N2 = N // P2
         self.comm0 = comm.Split(self.rank/P1)
         self.comm1 = comm.Split(self.rank%P1)
         self.comm0_rank = self.comm0.Get_rank()
         self.comm1_rank = self.comm1.Get_rank()
         self.work_arrays = work_arrays()
-        self.N1f = self.N1[2]/2 if self.comm0_rank < self.P1-1 else self.N1[2]/2+1
+        self.N1f = self.N1[2]//2 if self.comm0_rank < self.P1-1 else self.N1[2]//2+1
         if self.communication == 'Nyquist':
-            self.N1f = self.N1[2]/2
-        
+            self.N1f = self.N1[2]//2
+
         if not (self.num_processes % 2 == 0 or self.num_processes == 1):
             raise IOError("Number of cpus must be even")
 
@@ -264,7 +265,7 @@ class R2CY(object):
 
     def work_shape(self, dealias):
         """Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved"""
-        if dealias == '3/2-rule':
+        if dealias == '3//2-rule':
             return self.real_shape_padded()
 
         else:
@@ -282,7 +283,7 @@ class R2CY(object):
         xyrank = self.comm1.Get_rank() # Local rank in xy-plane
         return (slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1),
                 slice(0, self.N[1]),
-                slice(xzrank*self.N1[2]/2, xzrank*self.N1[2]/2 + self.N1f, 1))
+                slice(xzrank*self.N1[2]//2, xzrank*self.N1[2]//2 + self.N1f, 1))
 
     def get_P(self):
         return self.P1, self.P2
@@ -309,7 +310,7 @@ class R2CY(object):
         ky = fftfreq(self.N[1], 1./self.N[1]).astype(int)
         kz = rfftfreq(self.N[2], 1./self.N[2]).astype(int)
         k2 = slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1)
-        k1 = slice(xzrank*self.N1[2]/2, xzrank*self.N1[2]/2 + self.N1f, 1)
+        k1 = slice(xzrank*self.N1[2]//2, xzrank*self.N1[2]//2 + self.N1f, 1)
         K = np.array(np.meshgrid(kx[k2], ky, kz[k1], indexing='ij'), dtype=self.float)
         return K
 
@@ -324,19 +325,19 @@ class R2CY(object):
     def get_dealias_filter(self):
         """Filter for dealiasing nonlinear convection"""
         K = self.get_local_wavenumbermesh()
-        kmax = 2./3.*(self.N/2+1)
+        kmax = 2./3.*(self.N//2+1)
         dealias = np.array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                            (abs(K[2]) < kmax[2]), dtype=np.uint8)
         return dealias
 
     def copy_to_padded_x(self, fu, fp):
-        fp[:self.N[0]/2] = fu[:self.N[0]/2]
-        fp[-(self.N[0]/2):] = fu[self.N[0]/2:]
+        fp[:self.N[0]//2] = fu[:self.N[0]//2]
+        fp[-(self.N[0]//2):] = fu[self.N[0]//2:]
         return fp
 
     def copy_to_padded_y(self, fu, fp):
-        fp[:, :self.N[1]/2] = fu[:, :self.N[1]/2]
-        fp[:, -(self.N[1]/2):] = fu[:, self.N[1]/2:]
+        fp[:, :self.N[1]//2] = fu[:, :self.N[1]//2]
+        fp[:, -(self.N[1]//2):] = fu[:, self.N[1]//2:]
         return fp
 
     def copy_to_padded_z(self, fu, fp):
@@ -348,19 +349,19 @@ class R2CY(object):
         return fu
 
     def copy_from_padded_x(self, fp, fu):
-        fu[:self.N[0]/2] = fp[:self.N[0]/2]
-        fu[self.N[0]/2:] = fp[-self.N[0]/2:]
+        fu[:self.N[0]//2] = fp[:self.N[0]//2]
+        fu[self.N[0]//2:] = fp[-self.N[0]//2:]
         return fu
 
     def copy_from_padded_y(self, fp, fu):
-        fu[:, :self.N[1]/2] = fp[:, :self.N[1]/2]
-        fu[:, self.N[1]/2:] = fp[:, -self.N[1]/2:]
+        fu[:, :self.N[1]//2] = fp[:, :self.N[1]//2]
+        fu[:, self.N[1]//2:] = fp[:, -self.N[1]//2:]
         return fu
 
     def global_complex_shape(self, padsize=1.0):
         """Global size of problem in complex wavenumber space"""
         return (int(padsize*self.N[0]), int(padsize*self.N[1]),
-                int(padsize*self.N[2]/2+1))
+                int(padsize*self.N[2]//2+1))
 
     def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
@@ -382,7 +383,7 @@ class R2CY(object):
             Uc_hat_z = self.work_arrays[((N1[0], N2[1], Nf), self.complex, 0, False)]
 
             if self.communication == 'Nyquist':
-                Uc_hat_x = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0, False)]
+                Uc_hat_x = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 0, False)]
 
                 # Do first owned direction
                 Uc_hat_y = ifft(fu, Uc_hat_y, axis=1, threads=self.threads,
@@ -390,10 +391,10 @@ class R2CY(object):
 
                 # Transform to x all but k=N/2 (the neglected Nyquist mode)
                 Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, self.P2)
-                    
+
                 # Communicate in xz-plane and do fft in x-direction
                 self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
-                Uc_hat_x[:] = ifft(Uc_hat_x, axis=0, threads=self.threads, 
+                Uc_hat_x[:] = ifft(Uc_hat_x, axis=0, threads=self.threads,
                                    planner_effort=self.planner_effort['ifft'])
 
                 # Communicate and transform in xy-plane
@@ -407,7 +408,7 @@ class R2CY(object):
 
             elif self.communication == 'Swap':
                 # Additional work arrays
-                Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0, False)]
+                Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 0, False)]
                 Uc_hat_xp = self.work_arrays[((N[0], N2[1], N1f), self.complex, 0, False)]
                 xy_plane  = self.work_arrays[((N[0], N2[1]), self.complex, 0, False)]
                 xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0, False)]
@@ -424,7 +425,7 @@ class R2CY(object):
                 Uc_hat_xp[:] = ifft(Uc_hat_xp, axis=0, threads=self.threads,
                                     planner_effort=self.planner_effort['ifft'])
 
-                Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]/2]
+                Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]//2]
 
                 # Communicate and transform in xy-plane all but k=N/2
                 self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
@@ -471,11 +472,11 @@ class R2CY(object):
             padsize = self.padsize
             Uc_pad_hat_y  = self.work_arrays[((N2[0], int(padsize*N[1]), N1f), self.complex, 0)]
             Uc_pad_hat_z  = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), Nf), self.complex, 0)]
-            Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), int(padsize*N[2]/2)+1), self.complex, 0)]
+            Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), int(padsize*N[2]//2)+1), self.complex, 0)]
 
             if self.communication == 'Nyquist':
-                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
-                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
+                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
+                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
 
                 Uc_pad_hat_y = self.copy_to_padded_y(fu*padsize**3, Uc_pad_hat_y)
 
@@ -509,8 +510,8 @@ class R2CY(object):
                           planner_effort=self.planner_effort['irfft'])
 
             elif self.communication == 'Swap':
-                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
-                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
+                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
+                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
                 Uc_pad_hat_xr2  = self.work_arrays[((N[0], int(padsize*N2[1]), N1f), self.complex, 0)]
                 Uc_pad_hat_xy3  = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1f), self.complex, 0)]
                 xy2_pad_plane   = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1])), self.complex, 0)]
@@ -534,7 +535,7 @@ class R2CY(object):
                 Uc_pad_hat_xy3[:] = ifft(Uc_pad_hat_xy3, axis=0, threads=self.threads,
                                          planner_effort=self.planner_effort['ifft'])
 
-                Uc_pad_hat_xy[:] = Uc_pad_hat_xy3[:, :, :N1[2]/2]
+                Uc_pad_hat_xy[:] = Uc_pad_hat_xy3[:, :, :N1[2]//2]
 
                 # Communicate and transform in xy-plane all but k=N/2
                 self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
@@ -603,7 +604,7 @@ class R2CY(object):
             Uc_hat_z  = self.work_arrays[((N1[0], N2[1], Nf), self.complex, 0)]
 
             if self.communication == 'Nyquist':
-                Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0)]
+                Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 0)]
 
                 # Do fft in z direction on owned data
                 Uc_hat_z = rfft(u, Uc_hat_z, axis=2, threads=self.threads,
@@ -628,10 +629,10 @@ class R2CY(object):
             elif self.communication == 'Swap':
 
                 # Additional work arrays
-                Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]/2), self.complex, 0)]
+                Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 0)]
                 Uc_hat_xr2= self.work_arrays[((N[0], N2[1], N1f), self.complex, 0)]
                 xy_plane  = self.work_arrays[((N[0], N2[1]), self.complex, 0)]
-                xy_plane2 = self.work_arrays[((N[0]/2+1, N2[1]), self.complex, 0)]
+                xy_plane2 = self.work_arrays[((N[0]//2+1, N2[1]), self.complex, 0)]
                 xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0)]
 
                 # Do fft in z direction on owned data
@@ -648,7 +649,7 @@ class R2CY(object):
                 self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 Uc_hat_x[:] = fft(Uc_hat_x, axis=0, threads=self.threads,
                                   planner_effort=self.planner_effort['fft'])
-                Uc_hat_xr2[:, :, :N1[2]/2] = Uc_hat_x[:]
+                Uc_hat_xr2[:, :, :N1[2]//2] = Uc_hat_x[:]
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
                 if self.comm0_rank == 0:
@@ -707,11 +708,11 @@ class R2CY(object):
             padsize = self.padsize
             Uc_pad_hat_y  = self.work_arrays[((N2[0], int(padsize*N[1]), N1f), self.complex, 0)]
             Uc_pad_hat_z  = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), Nf), self.complex, 0)]
-            Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), int(padsize*N[2]/2)+1), self.complex, 0)]
+            Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), int(padsize*N[2]//2)+1), self.complex, 0)]
 
             if self.communication == 'Nyquist':
-                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
-                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
+                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
+                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
 
                 # Do fft in z direction on owned data
                 Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads,
@@ -741,10 +742,10 @@ class R2CY(object):
 
             elif self.communication == 'Swap':
 
-                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
-                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]/2), self.complex, 0)]
+                Uc_pad_hat_x  = self.work_arrays[((N[0], int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
+                Uc_pad_hat_xy = self.work_arrays[((int(padsize*N[0]), int(padsize*N2[1]), N1[2]//2), self.complex, 0)]
                 xy_pad_plane = self.work_arrays[((N[0], int(padsize*N2[1])), self.complex, 0)]
-                xy_pad_plane2= self.work_arrays[((N[0]/2+1, int(padsize*N2[1])), self.complex, 0)]
+                xy_pad_plane2= self.work_arrays[((N[0]//2+1, int(padsize*N2[1])), self.complex, 0)]
                 Uc_pad_hat_xr2  = self.work_arrays[((N[0], int(padsize*N2[1]), N1f), self.complex, 0)]
 
                 # Do fft in z direction on owned data
@@ -766,7 +767,7 @@ class R2CY(object):
 
                 Uc_pad_hat_x = self.copy_from_padded_x(Uc_pad_hat_xy, Uc_pad_hat_x)
 
-                Uc_pad_hat_xr2[:, :, :N1[2]/2] = Uc_pad_hat_x[:]
+                Uc_pad_hat_xr2[:, :, :N1[2]//2] = Uc_pad_hat_x[:]
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
                 if self.comm0_rank == 0:
@@ -850,9 +851,9 @@ class R2CX(R2CY):
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE")):
         R2CY.__init__(self, N, L, comm, precision, P1=P1, communication=communication,
                       padsize=padsize, threads=threads, planner_effort=planner_effort)
-        self.N2f = self.N2[2]/2 if self.comm1_rank < self.P2-1 else self.N2[2]/2+1
+        self.N2f = self.N2[2]//2 if self.comm1_rank < self.P2-1 else self.N2[2]//2+1
         if self.communication == 'Nyquist':
-            self.N2f = self.N2[2]/2
+            self.N2f = self.N2[2]//2
         if self.communication == 'Alltoallw':
             q = _subsize(self.Nf, self.P2, self.comm1_rank)
             self.N2f = q
@@ -885,7 +886,7 @@ class R2CX(R2CY):
         yzrank = self.comm1.Get_rank() # Local rank in yz-plane
         return (slice(0, self.N[0]),
                 slice(xyrank*self.N1[1], (xyrank+1)*self.N1[1], 1),
-                slice(yzrank*self.N2[2]/2, yzrank*self.N2[2]/2 + self.N2f, 1))
+                slice(yzrank*self.N2[2]//2, yzrank*self.N2[2]//2 + self.N2f, 1))
 
     def get_local_mesh(self):
         xyrank = self.comm0.Get_rank() # Local rank in xz-plane
@@ -909,7 +910,7 @@ class R2CX(R2CY):
         ky = fftfreq(self.N[1], 1./self.N[1]).astype(int)
         kz = fftfreq(self.N[2], 1./self.N[2]).astype(int)
         k2 = slice(xyrank*self.N1[1], (xyrank+1)*self.N1[1], 1)
-        k1 = slice(yzrank*self.N2[2]/2, (yzrank+1)*self.N2[2]/2, 1)
+        k1 = slice(yzrank*self.N2[2]//2, (yzrank+1)*self.N2[2]//2, 1)
         K  = np.array(np.meshgrid(kx, ky[k2], kz[k1], indexing='ij'), dtype=self.float)
         return K
 
@@ -962,7 +963,7 @@ class R2CX(R2CY):
             Uc_hat_x  = self.work_arrays[((self.N[0], self.N1[1], self.N2f), self.complex, 0)]
 
             if self.communication == 'Nyquist':
-                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
+                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]//2), self.complex, 0)]
                 Uc_hat_y = Uc_hat_y_T.transpose((1, 0, 2))
 
                 # Do first owned direction
@@ -987,7 +988,7 @@ class R2CX(R2CY):
                           planner_effort=self.planner_effort['irfft'])
 
             elif self.communication == 'Swap':
-                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
+                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]//2), self.complex, 0)]
                 Uc_hat_y = Uc_hat_y_T.transpose((1, 0, 2))
                 Uc_hat_y2  = self.work_arrays[((self.N1[0], self.N[1], self.N2f), self.complex, 0)]
                 xy_plane_T  = self.work_arrays[((self.N[1], self.N1[0]), self.complex, 0)]
@@ -1008,7 +1009,7 @@ class R2CX(R2CY):
                 xy_plane[:] = Uc_hat_y2[:, :, -1]
 
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
-                Uc_hat_y[:] = Uc_hat_y2[:, :, :self.N2[2]/2]
+                Uc_hat_y[:] = Uc_hat_y2[:, :, :self.N2[2]//2]
                 self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
                 Uc_hat_z = transform_Uc_zy(Uc_hat_z, Uc_hat_y, self.P2)
 
@@ -1047,15 +1048,15 @@ class R2CX(R2CY):
         else:
             # Intermediate work arrays required for transform
             Uc_pad_hat_z  = self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), self.Nf), self.complex, 0)]
-            Uc_pad_hat_z2 = self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), int(self.padsize*self.N[2]/2)+1), self.complex, 0)]
+            Uc_pad_hat_z2 = self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N2[1]), int(self.padsize*self.N[2]//2)+1), self.complex, 0)]
             Uc_pad_hat_x  = self.work_arrays[((int(self.padsize*self.N[0]), self.N1[1], self.N2f), self.complex, 0)]
 
             if self.communication == 'Nyquist':
-                Uc_pad_hat_y_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_y_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_y = Uc_pad_hat_y_T.transpose((1, 0, 2))
-                Uc_pad_hat_xy_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_xy_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_xy = Uc_pad_hat_xy_T.transpose((1, 0, 2))
-                Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2[2]//2), self.complex, 0)]
 
                 Uc_pad_hat_x = self.copy_to_padded_x(fu*self.padsize**3, Uc_pad_hat_x)
 
@@ -1085,11 +1086,11 @@ class R2CX(R2CY):
                           planner_effort=self.planner_effort['irfft'])
 
             elif self.communication == 'Swap':
-                Uc_pad_hat_y_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_y_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_y = Uc_pad_hat_y_T.transpose((1, 0, 2))
-                Uc_pad_hat_xy_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_xy_T= self.work_arrays[((int(self.padsize*self.N[1]), int(self.padsize*self.N1[0]), self.N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_xy = Uc_pad_hat_xy_T.transpose((1, 0, 2))
-                Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_y2_T= self.work_arrays[((self.N[1], int(self.padsize*self.N1[0]), self.N2f), self.complex, 0)]
                 Uc_pad_hat_y2 = Uc_pad_hat_y2_T.transpose((1, 0, 2))
                 Uc_pad_hat_xy2= self.work_arrays[((int(self.padsize*self.N1[0]), int(self.padsize*self.N[1]), self.N2f), self.complex, 0)]
@@ -1117,7 +1118,7 @@ class R2CX(R2CY):
                 xy_plane[:] = Uc_pad_hat_xy2[:, :, -1]
 
                 # Communicate and transform in yz-plane. Transpose required to put distributed axis first.
-                Uc_pad_hat_xy[:] = Uc_pad_hat_xy2[:, :, :self.N2[2]/2]
+                Uc_pad_hat_xy[:] = Uc_pad_hat_xy2[:, :, :self.N2[2]//2]
                 self.comm1.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy_T, self.mpitype])
                 Uc_pad_hat_z = transform_Uc_zy(Uc_pad_hat_z, Uc_pad_hat_xy, self.P2)
 
@@ -1175,10 +1176,10 @@ class R2CX(R2CY):
             Uc_hat_z  = self.work_arrays[((self.N1[0], self.N2[1], self.Nf), self.complex, 0)]
 
             if self.communication == 'Nyquist':
-                Uc_hat_x  = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]/2), self.complex, 0)]
-                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
+                Uc_hat_x  = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]//2), self.complex, 0)]
+                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]//2), self.complex, 0)]
                 Uc_hat_y  = Uc_hat_y_T.transpose((1, 0, 2))
-                Uc_hat_y2= self.work_arrays[((self.N1[0], self.N[1], self.N2[2]/2), self.complex, 1)]
+                Uc_hat_y2= self.work_arrays[((self.N1[0], self.N[1], self.N2[2]//2), self.complex, 1)]
 
                 # Do fft in z direction on owned data
                 Uc_hat_z = rfft(u, Uc_hat_z, axis=2, threads=self.threads,
@@ -1201,15 +1202,15 @@ class R2CX(R2CY):
                          planner_effort=self.planner_effort['fft'])
 
             elif self.communication == 'Swap':
-                Uc_hat_x  = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]/2), self.complex, 0)]
-                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]/2), self.complex, 0)]
+                Uc_hat_x  = self.work_arrays[((self.N[0], self.N1[1], self.N2[2]//2), self.complex, 0)]
+                Uc_hat_y_T= self.work_arrays[((self.N[1], self.N1[0], self.N2[2]//2), self.complex, 0)]
                 Uc_hat_y  = Uc_hat_y_T.transpose((1, 0, 2))
                 Uc_hat_y2  = self.work_arrays[((self.N1[0], self.N[1], self.N2f), self.complex, 0)]
                 Uc_hat_x2  = self.work_arrays[((self.N[0], self.N1[1], self.N2f), self.complex, 0)]
-                Uc_hat_y3  = self.work_arrays[((self.N1[0], self.N[1], self.N2[2]/2), self.complex, 0)]
+                Uc_hat_y3  = self.work_arrays[((self.N1[0], self.N[1], self.N2[2]//2), self.complex, 0)]
                 xy_plane_T = self.work_arrays[((self.N[1], self.N1[0]), self.complex, 0)]
                 xy_plane = xy_plane_T.transpose((1, 0))
-                xy_plane2 = self.work_arrays[((self.N[1]/2+1, self.N1[0]), self.complex, 0)]
+                xy_plane2 = self.work_arrays[((self.N[1]//2+1, self.N1[0]), self.complex, 0)]
 
                 # Do fft in z direction on owned data
                 Uc_hat_z = rfft(u, Uc_hat_z, axis=2, threads=self.threads,
@@ -1225,7 +1226,7 @@ class R2CX(R2CY):
                 self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_y_T, self.mpitype])
                 Uc_hat_y3 = fft(Uc_hat_y, Uc_hat_y3, axis=1, threads=self.threads,
                                 planner_effort=self.planner_effort['fft'])
-                Uc_hat_y2[:, :, :self.N2[2]/2] = Uc_hat_y3[:]
+                Uc_hat_y2[:, :, :self.N2[2]//2] = Uc_hat_y3[:]
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
                 if self.comm1_rank == 0:
@@ -1285,14 +1286,14 @@ class R2CX(R2CY):
 
             # Intermediate work arrays required for transform
             Uc_pad_hat_z  = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), Nf), self.complex, 0)]
-            Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), int(padsize*N[2]/2)+1), self.complex, 0)]
+            Uc_pad_hat_z2 = self.work_arrays[((int(padsize*N1[0]), int(padsize*N2[1]), int(padsize*N[2]//2)+1), self.complex, 0)]
 
             if self.communication == 'Nyquist':
-                Uc_pad_hat_x  = self.work_arrays[((int(padsize*N[0]), N1[1], N2[2]/2), self.complex, 0)]
-                Uc_pad_hat_xy_T= self.work_arrays[((int(padsize*N[1]), int(padsize*N1[0]), N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_x  = self.work_arrays[((int(padsize*N[0]), N1[1], N2[2]//2), self.complex, 0)]
+                Uc_pad_hat_xy_T= self.work_arrays[((int(padsize*N[1]), int(padsize*N1[0]), N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_xy  = Uc_pad_hat_xy_T.transpose((1, 0, 2))
-                Uc_pad_hat_xy2= self.work_arrays[((int(padsize*N1[0]), int(padsize*N[1]), N2[2]/2), self.complex, 0)]
-                Uc_pad_hat_y_T= self.work_arrays[((N[1], int(padsize*N1[0]), N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_xy2= self.work_arrays[((int(padsize*N1[0]), int(padsize*N[1]), N2[2]//2), self.complex, 0)]
+                Uc_pad_hat_y_T= self.work_arrays[((N[1], int(padsize*N1[0]), N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_y  = Uc_pad_hat_y_T.transpose((1, 0, 2))
 
                 # Do fft in z direction on owned data
@@ -1322,17 +1323,17 @@ class R2CX(R2CY):
                 fu /= padsize**3
 
             elif self.communication == 'Swap':
-                Uc_pad_hat_xy_T= self.work_arrays[((int(padsize*N[1]), int(padsize*N1[0]), N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_xy_T= self.work_arrays[((int(padsize*N[1]), int(padsize*N1[0]), N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_xy  = Uc_pad_hat_xy_T.transpose((1, 0, 2))
-                Uc_pad_hat_xy2= self.work_arrays[((int(padsize*N1[0]), int(padsize*N[1]), N2[2]/2), self.complex, 0)]
-                Uc_pad_hat_y_T= self.work_arrays[((N[1], int(padsize*N1[0]), N2[2]/2), self.complex, 0)]
+                Uc_pad_hat_xy2= self.work_arrays[((int(padsize*N1[0]), int(padsize*N[1]), N2[2]//2), self.complex, 0)]
+                Uc_pad_hat_y_T= self.work_arrays[((N[1], int(padsize*N1[0]), N2[2]//2), self.complex, 0)]
                 Uc_pad_hat_y  = Uc_pad_hat_y_T.transpose((1, 0, 2))
                 Uc_pad_hat_y2_T= self.work_arrays[((N[1], int(padsize*N1[0]), N2f), self.complex, 0)]
                 Uc_pad_hat_y2  = Uc_pad_hat_y2_T.transpose((1, 0, 2))
                 Uc_pad_hat_x2  = self.work_arrays[((int(padsize*N[0]), N1[1], N2f), self.complex, 0)]
                 xy_plane_T  = self.work_arrays[((self.N[1], int(self.padsize*self.N1[0])), self.complex, 0)]
                 xy_plane = xy_plane_T.transpose((1, 0))
-                xy_plane2 = self.work_arrays[((self.N[1]/2+1, int(self.padsize*self.N1[0])), self.complex, 0)]
+                xy_plane2 = self.work_arrays[((self.N[1]//2+1, int(self.padsize*self.N1[0])), self.complex, 0)]
 
                 # Do fft in z direction on owned data
                 Uc_pad_hat_z2 = rfft(u, Uc_pad_hat_z2, axis=2, threads=self.threads,
@@ -1353,7 +1354,7 @@ class R2CX(R2CY):
 
                 Uc_pad_hat_y = self.copy_from_padded_y(Uc_pad_hat_xy2, Uc_pad_hat_y)
 
-                Uc_pad_hat_y2[:, :, :self.N2[2]/2] = Uc_pad_hat_y[:]
+                Uc_pad_hat_y2[:, :, :self.N2[2]//2] = Uc_pad_hat_y[:]
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
                 if self.comm1_rank == 0:
@@ -1408,7 +1409,7 @@ class R2CX(R2CY):
                     [Uc_pad_hat_y, self._counts_displs1, self._subarrays1B_pad],
                     [Uc_pad_hat_x, self._counts_displs1, self._subarrays1A_pad])
 
-                # Do fft for last direction 
+                # Do fft for last direction
                 Uc_pad_hat_x[:] = fft(Uc_pad_hat_x, axis=0, threads=self.threads,
                                       planner_effort=self.planner_effort['fft'])
                 fu = self.copy_from_padded_x(Uc_pad_hat_x, fu)

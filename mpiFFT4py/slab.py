@@ -1,8 +1,9 @@
+from __future__ import division
 """Slab decomposition
 
 This module contains classes for performing FFTs with slab decomposition
-of three-dimensional data structures data[Nx, Ny, Nz], where (Nx, Ny, Nz) is 
-the shape of the input data. With slab decomposition only one of these three 
+of three-dimensional data structures data[Nx, Ny, Nz], where (Nx, Ny, Nz) is
+the shape of the input data. With slab decomposition only one of these three
 indices is shared, leading to local datastructures on each processor
 with shape data[Nx/P, Ny, Nz], where P is the total number of processors.
 
@@ -71,8 +72,8 @@ class R2C(object):
         assert len(L) == 3
         assert len(N) == 3
         self.N = N
-        self.Nf = N[2]/2+1          # Independent complex wavenumbers in z-direction
-        self.Nfp = int(padsize*N[2]/2+1) # Independent complex wavenumbers in z-direction for padded array
+        self.Nf = N[2]//2+1          # Independent complex wavenumbers in z-direction
+        self.Nfp = int(padsize*N[2]//2+1) # Independent complex wavenumbers in z-direction for padded array
         self.comm = comm
         self.float, self.complex, self.mpitype = datatypes(precision)
         self.communication = communication
@@ -113,7 +114,7 @@ class R2C(object):
     def global_complex_shape(self, padsize=1.):
         """Global size of problem in complex wavenumber space"""
         return (int(padsize*self.N[0]), int(padsize*self.N[1]),
-                int(padsize*self.N[2]/2+1))
+                int(padsize*self.N[2]//2+1))
 
     def work_shape(self, dealias):
         """Shape of work arrays used in convection with dealiasing.
@@ -128,7 +129,7 @@ class R2C(object):
 
     def real_local_slice(self, padsize=1):
         """Local slice in real space of the input array
-        
+
         Array can be padded with padsize > 1
         """
         return (slice(int(padsize*self.rank*self.Np[0]),
@@ -178,7 +179,7 @@ class R2C(object):
     def get_dealias_filter(self):
         """Filter for dealiasing nonlinear convection"""
         K = self.get_local_wavenumbermesh()
-        kmax = 2./3.*(self.N/2+1)
+        kmax = 2./3.*(self.N//2+1)
         dealias = np.array((abs(K[0]) < kmax[0])*(abs(K[1]) < kmax[1])*
                            (abs(K[2]) < kmax[2]), dtype=np.uint8)
         return dealias
@@ -236,17 +237,17 @@ class R2C(object):
 
                 # First create padded complex array and then perform irfftn
                 fu_padded = self.work_arrays[(self.global_complex_shape(padsize=1.5), self.complex, 0)]
-                fu_padded[:self.N[0]/2, :self.N[1]/2, :self.Nf] = fu[:self.N[0]/2, :self.N[1]/2]
-                fu_padded[:self.N[0]/2, -self.N[1]/2:, :self.Nf] = fu[:self.N[0]/2, self.N[1]/2:]
-                fu_padded[-self.N[0]/2:, :self.N[1]/2, :self.Nf] = fu[self.N[0]/2:, :self.N[1]/2]
-                fu_padded[-self.N[0]/2:, -self.N[1]/2:, :self.Nf] = fu[self.N[0]/2:, -self.N[1]/2:]
+                fu_padded[:self.N[0]//2, :self.N[1]//2, :self.Nf] = fu[:self.N[0]//2, :self.N[1]//2]
+                fu_padded[:self.N[0]//2, -self.N[1]//2:, :self.Nf] = fu[:self.N[0]//2, self.N[1]//2:]
+                fu_padded[-self.N[0]//2:, :self.N[1]//2, :self.Nf] = fu[self.N[0]//2:, :self.N[1]//2]
+                fu_padded[-self.N[0]//2:, -self.N[1]//2:, :self.Nf] = fu[self.N[0]//2:, -self.N[1]//2:]
 
                 ## Current transform is only exactly reversible if periodic transforms are made symmetric
                 ## However, this seems to lead to more aliasing and as such the non-symmetrical padding is used
-                #fu_padded[:, -self.N[1]/2] *= 0.5
-                #fu_padded[-self.N[0]/2] *= 0.5
-                #fu_padded[self.N[0]/2] = fu_padded[-self.N[0]/2]
-                #fu_padded[:, self.N[1]/2] = fu_padded[:, -self.N[1]/2]
+                #fu_padded[:, -self.N[1]//2] *= 0.5
+                #fu_padded[-self.N[0]//2] *= 0.5
+                #fu_padded[self.N[0]//2] = fu_padded[-self.N[0]//2]
+                #fu_padded[:, self.N[1]//2] = fu_padded[:, -self.N[1]//2]
 
                 u[:] = irfftn(fu_padded*self.padsize**3, overwrite_input=True,
                               axes=(0, 1, 2), threads=self.threads,
@@ -292,7 +293,7 @@ class R2C(object):
             u = irfft2(Uc_hatT, u, overwrite_input=True, axes=(1, 2), threads=self.threads, planner_effort=self.planner_effort['irfft2'])
 
         else:
-            assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"
+            assert self.num_processes <= self.N[0]//2, "Number of processors cannot be larger than N[0]//2 for 3/2-rule"
 
             # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0)]
@@ -362,14 +363,14 @@ class R2C(object):
                                   planner_effort=self.planner_effort['rfftn'])
 
                 # Copy with truncation
-                fu[:self.N[0]/2, :self.N[1]/2] = fu_padded[:self.N[0]/2, :self.N[1]/2, :self.Nf]
-                fu[:self.N[0]/2, self.N[1]/2:] = fu_padded[:self.N[0]/2, -self.N[1]/2:, :self.Nf]
-                fu[self.N[0]/2:, :self.N[1]/2] = fu_padded[-self.N[0]/2:, :self.N[1]/2, :self.Nf]
-                fu[self.N[0]/2:, self.N[1]/2:] = fu_padded[-self.N[0]/2:, -self.N[1]/2:, :self.Nf]
+                fu[:self.N[0]//2, :self.N[1]//2] = fu_padded[:self.N[0]//2, :self.N[1]//2, :self.Nf]
+                fu[:self.N[0]//2, self.N[1]//2:] = fu_padded[:self.N[0]//2, -self.N[1]//2:, :self.Nf]
+                fu[self.N[0]//2:, :self.N[1]//2] = fu_padded[-self.N[0]//2:, :self.N[1]//2, :self.Nf]
+                fu[self.N[0]//2:, self.N[1]//2:] = fu_padded[-self.N[0]//2:, -self.N[1]//2:, :self.Nf]
                 fu /= self.padsize**3
                 ## Modify for symmetric padding
-                #fu[:, -self.N[1]/2] *= 2
-                #fu[self.N[0]/2] *= 2
+                #fu[:, -self.N[1]//2] *= 2
+                #fu[self.N[0]//2] *= 2
 
             return fu
 
@@ -429,7 +430,7 @@ class R2C(object):
                      threads=self.threads, planner_effort=self.planner_effort['fft'])
 
         else:
-            assert self.num_processes <= self.N[0]/2, "Number of processors cannot be larger than N[0]/2 for 3/2-rule"
+            assert self.num_processes <= self.N[0]//2, "Number of processors cannot be larger than N[0]//2 for 3/2-rule"
             assert u.shape == self.real_shape_padded()
 
             # Intermediate work arrays required for transform
@@ -463,8 +464,8 @@ class R2C(object):
                            planner_effort=self.planner_effort['fft'])
 
             # Truncate to original complex shape
-            fu[:self.N[0]/2] = Upad_hat[:self.N[0]/2]
-            fu[self.N[0]/2:] = Upad_hat[-self.N[0]/2:]
+            fu[:self.N[0]//2] = Upad_hat[:self.N[0]//2]
+            fu[self.N[0]//2:] = Upad_hat[-self.N[0]//2:]
             fu /= self.padsize**3
 
         return fu
@@ -501,20 +502,20 @@ class R2C(object):
     @staticmethod
     def copy_to_padded(fu, fp, N, axis=0):
         if axis == 0:
-            fp[:N[0]/2] = fu[:N[0]/2]
-            fp[-N[0]/2:] = fu[N[0]/2:]
+            fp[:N[0]//2] = fu[:N[0]//2]
+            fp[-N[0]//2:] = fu[N[0]//2:]
         elif axis == 1:
-            fp[:, :N[1]/2] = fu[:, :N[1]/2]
-            fp[:, -N[1]/2:] = fu[:, N[1]/2:]
+            fp[:, :N[1]//2] = fu[:, :N[1]//2]
+            fp[:, -N[1]//2:] = fu[:, N[1]//2:]
         elif axis == 2:
-            fp[:, :, :(N[2]/2+1)] = fu[:]
+            fp[:, :, :(N[2]//2+1)] = fu[:]
         return fp
 
     @staticmethod
     def copy_from_padded(fp, fu, N, axis=0):
         if axis == 1:
-            fu[:, :N[1]/2] = fp[:, :N[1]/2, :(N[2]/2+1)]
-            fu[:, N[1]/2:] = fp[:, -N[1]/2:, :(N[2]/2+1)]
+            fu[:, :N[1]//2] = fp[:, :N[1]//2, :(N[2]//2+1)]
+            fu[:, N[1]//2:] = fp[:, -N[1]//2:, :(N[2]//2+1)]
         elif axis == 2:
             fu[:] = fp[:, :, :(N[2]//2+1)]
         return fu
@@ -606,10 +607,10 @@ class C2C(R2C):
 
                 # First create padded complex array and then perform irfftn
                 fu_padded = self.work_arrays[(u, 0)]
-                fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks] = fu[:self.N[0]/2, :self.N[1]/2]
-                fu_padded[:self.N[0]/2, -self.N[1]/2:, self.ks] = fu[:self.N[0]/2, self.N[1]/2:]
-                fu_padded[-self.N[0]/2:, :self.N[1]/2, self.ks] = fu[self.N[0]/2:, :self.N[1]/2]
-                fu_padded[-self.N[0]/2:, -self.N[1]/2:, self.ks] = fu[self.N[0]/2:, self.N[1]/2:]
+                fu_padded[:self.N[0]//2, :self.N[1]//2, self.ks] = fu[:self.N[0]//2, :self.N[1]//2]
+                fu_padded[:self.N[0]//2, -self.N[1]//2:, self.ks] = fu[:self.N[0]//2, self.N[1]//2:]
+                fu_padded[-self.N[0]//2:, :self.N[1]//2, self.ks] = fu[self.N[0]//2:, :self.N[1]//2]
+                fu_padded[-self.N[0]//2:, -self.N[1]//2:, self.ks] = fu[self.N[0]//2:, self.N[1]//2:]
                 u = ifftn(fu_padded*self.padsize**3, u, overwrite_input=True,
                           axes=(0, 1, 2), threads=self.threads,
                           planner_effort=self.planner_effort['ifftn'])
@@ -711,10 +712,10 @@ class C2C(R2C):
                                  planner_effort=self.planner_effort['fftn'])
 
                 # Copy with truncation
-                fu[:self.N[0]/2, :self.N[1]/2] = fu_padded[:self.N[0]/2, :self.N[1]/2, self.ks]
-                fu[:self.N[0]/2, self.N[1]/2:] = fu_padded[:self.N[0]/2, -self.N[1]/2:, self.ks]
-                fu[self.N[0]/2:, :self.N[1]/2] = fu_padded[-self.N[0]/2:, :self.N[1]/2, self.ks]
-                fu[self.N[0]/2:, self.N[1]/2:] = fu_padded[-self.N[0]/2:, -self.N[1]/2:, self.ks]
+                fu[:self.N[0]//2, :self.N[1]//2] = fu_padded[:self.N[0]//2, :self.N[1]//2, self.ks]
+                fu[:self.N[0]//2, self.N[1]//2:] = fu_padded[:self.N[0]//2, -self.N[1]//2:, self.ks]
+                fu[self.N[0]//2:, :self.N[1]//2] = fu_padded[-self.N[0]//2:, :self.N[1]//2, self.ks]
+                fu[self.N[0]//2:, self.N[1]//2:] = fu_padded[-self.N[0]//2:, -self.N[1]//2:, self.ks]
                 fu /= self.padsize**3
             return fu
 
@@ -772,8 +773,8 @@ class C2C(R2C):
             Upad_hat = fft(Upad_hat0, Upad_hat, overwrite_input=True, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
 
             # Truncate to original complex shape
-            fu[:self.N[0]/2] = Upad_hat[:self.N[0]/2]
-            fu[self.N[0]/2:] = Upad_hat[-self.N[0]/2:]
+            fu[:self.N[0]//2] = Upad_hat[:self.N[0]//2]
+            fu[self.N[0]//2:] = Upad_hat[-self.N[0]//2:]
             fu /= self.padsize**3
 
         return fu
@@ -781,23 +782,23 @@ class C2C(R2C):
     @staticmethod
     def copy_to_padded(fu, fp, N, axis=0):
         if axis == 0:
-            fp[:N[0]/2] = fu[:N[0]/2]
-            fp[-N[0]/2:] = fu[N[0]/2:]
+            fp[:N[0]//2] = fu[:N[0]//2]
+            fp[-N[0]//2:] = fu[N[0]//2:]
         elif axis == 1:
-            fp[:, :N[1]/2] = fu[:, :N[1]/2]
-            fp[:, -N[1]/2:] = fu[:, N[1]/2:]
+            fp[:, :N[1]//2] = fu[:, :N[1]//2]
+            fp[:, -N[1]//2:] = fu[:, N[1]//2:]
         elif axis == 2:
-            fp[:, :, :N[2]/2] = fu[:, :, :N[2]/2]
-            fp[:, :, -N[2]/2:] = fu[:, :, N[2]/2:]
+            fp[:, :, :N[2]//2] = fu[:, :, :N[2]//2]
+            fp[:, :, -N[2]//2:] = fu[:, :, N[2]//2:]
         return fp
 
     @staticmethod
     def copy_from_padded(fp, fu, N, axis=0):
         if axis == 1:
-            fu[:, :N[1]/2, :N[2]/2] = fp[:, :N[1]/2, :N[2]/2]
-            fu[:, :N[1]/2, N[2]/2:] = fp[:, :N[1]/2, -N[2]/2:]
-            fu[:, N[1]/2:, :N[2]/2] = fp[:, -N[1]/2:, :N[2]/2]
-            fu[:, N[1]/2:, N[2]/2:] = fp[:, -N[1]/2:, -N[2]/2:]
+            fu[:, :N[1]//2, :N[2]//2] = fp[:, :N[1]//2, :N[2]//2]
+            fu[:, :N[1]//2, N[2]//2:] = fp[:, :N[1]//2, -N[2]//2:]
+            fu[:, N[1]//2:, :N[2]//2] = fp[:, -N[1]//2:, :N[2]//2]
+            fu[:, N[1]//2:, N[2]//2:] = fp[:, -N[1]//2:, -N[2]//2:]
 
         return fu
 
