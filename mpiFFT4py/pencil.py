@@ -265,7 +265,7 @@ class R2CY(object):
 
     def work_shape(self, dealias):
         """Shape of work arrays used in convection with dealiasing. Different shape whether or not padding is involved"""
-        if dealias == '3//2-rule':
+        if dealias == '3/2-rule':
             return self.real_shape_padded()
 
         else:
