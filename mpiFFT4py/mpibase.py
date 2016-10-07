@@ -142,4 +142,3 @@ def datatypes(precision):
     assert precision in ("single", "double")
     return {"single": (np.float32, np.complex64, MPI.C_FLOAT_COMPLEX),
             "double": (np.float64, np.complex128, MPI.C_DOUBLE_COMPLEX)}[precision]
-

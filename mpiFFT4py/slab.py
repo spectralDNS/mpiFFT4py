@@ -79,7 +79,7 @@ class R2C(object):
         self.communication = communication
         self.num_processes = comm.Get_size()
         self.rank = comm.Get_rank()
-        self.Np = N / self.num_processes
+        self.Np = N // self.num_processes
         self.L = L.astype(self.float)
         self.dealias = np.zeros(0)
         self.padsize = padsize
