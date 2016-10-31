@@ -1,0 +1,4 @@
+mpi4py
+cython
+numpy>=1.6
+scipy>=0.12.0
