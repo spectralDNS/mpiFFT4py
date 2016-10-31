@@ -24,10 +24,17 @@ L = array([2*pi, 2*pi, 2*pi])
 ks = (fftfreq(N)*N).astype(int)
 comm = MPI.COMM_WORLD
 
-@pytest.fixture(params=("pencilsys", "pencilsyd", "pencilnys", "pencilnyd", 
-                        "pencilsxd", "pencilsxs", "pencilnxd", "pencilnxs", 
-                        "pencilaxd", "pencilaxs", "pencilayd", "pencilays",
-                        "slabas", "slabad", "slabws", "slabwd"), scope='module')
+if comm.Get_size() >= 4:
+    params = ("pencilsys", "pencilsyd", "pencilnys", "pencilnyd", 
+              "pencilsxd", "pencilsxs", "pencilnxd", "pencilnxs", 
+              "pencilaxd", "pencilaxs", "pencilayd", "pencilays",
+              "slabas", "slabad", "slabws", "slabwd")
+
+else:
+    params = ("slabas", "slabad", "slabws", "slabwd")
+
+@pytest.fixture(params=params, scope='module')
+
 def FFT(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
     if request.param[:3] == "pen":
