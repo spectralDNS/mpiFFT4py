@@ -19,7 +19,7 @@ def reset_profile(prof):
     for func in prof.functions:
         prof.add_function(func)
         
-N = 2**7
+N = 2**5
 L = array([2*pi, 2*pi, 2*pi])
 ks = (fftfreq(N)*N).astype(int)
 comm = MPI.COMM_WORLD
@@ -281,11 +281,11 @@ def test_FFT_C2C(FFT_C2C):
 #test_FFT(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
 #test_FFT2(Line_R2C(array([N, N]), L[:-1], MPI, "single"))
 #test_FFT2_padded(Line_R2C(array([N, N]), L[:-1], MPI, "double"))
-from collections import defaultdict
-FFT = Slab_R2C(array([N//4, N, N]), L, MPI.COMM_WORLD, "double", communication='Alltoallw', threads=2, planner_effort=defaultdict(lambda: "FFTW_MEASURE"))
-test_FFT_padded(FFT)
-reset_profile(profile)
-test_FFT_padded(FFT)
+#from collections import defaultdict
+#FFT = Slab_R2C(array([N//4, N, N]), L, MPI.COMM_WORLD, "double", communication='Alltoallw', threads=2, planner_effort=defaultdict(lambda: "FFTW_MEASURE"))
+#test_FFT_padded(FFT)
+#reset_profile(profile)
+#test_FFT_padded(FFT)
 
 #test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", communication='Nyquist'))
 #test_FFT_C2C(C2C(array([N, N, N]), L, MPI, "double"))
