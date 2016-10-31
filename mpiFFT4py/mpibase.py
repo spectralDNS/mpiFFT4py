@@ -37,13 +37,13 @@ Empty, Zeros = np.empty, np.zeros
 
 try:
     import pyfftw
-    def empty(N, dtype=np.float, bytes=None):
+    def empty(N, dtype=np.float, bytes=16):
         return pyfftw.byte_align(Empty(N, dtype=dtype), n=bytes)
 
-    def zeros(N, dtype=np.float, bytes=None):
+    def zeros(N, dtype=np.float, bytes=16):
         return pyfftw.byte_align(Zeros(N, dtype=dtype), n=bytes)
         
-except:
+except ImportError:
     def empty(N, dtype=np.float, bytes=None):
         return Empty(N, dtype=dtype)
 

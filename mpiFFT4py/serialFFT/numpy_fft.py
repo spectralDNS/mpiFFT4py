@@ -22,14 +22,13 @@ def dct(a, b, type=2, axis=0, **kw):
         return b
 
 # Define functions taking both input array and output array
-
 def fft(a, b=None, axis=0, threads=1, **kw):
     if b is None:
         return numpy.fft.fft(a, axis=axis)
     else:
         b[:] = numpy.fft.fft(a, axis=axis)
         return b
-        
+
 def ifft(a, b=None, axis=0, threads=1, **kw):
     if b is None:
         return numpy.fft.ifft(a, axis=axis)

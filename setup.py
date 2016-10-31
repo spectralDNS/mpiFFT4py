@@ -8,8 +8,7 @@ from numpy import get_include
 
 # Version number
 major = 1
-minor = 0
-maintenance = 0
+minor = 1
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "mpiFFT4py", "cython")
@@ -33,7 +32,7 @@ ext = cythonize(os.path.join(cdir, "*.pyx"))
 cmdclass = {'build_ext': build_ext_subclass}
 
 setup(name = "mpiFFT4py",
-      version = "%d.%d.%d" % (major, minor, maintenance),
+      version = "%d.%d" % (major, minor),
       description = "mpiFFT4py -- Parallel 3D FFT in Python using MPI for Python",
       long_description = "",
       author = "Mikael Mortensen",
@@ -45,7 +44,7 @@ setup(name = "mpiFFT4py",
           'Intended Audience :: Developers',
           'Intended Audience :: Science/Research',
           'Intended Audience :: Education',
-          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python',
           'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
           'Topic :: Scientific/Engineering :: Mathematics',
           'Topic :: Software Development :: Libraries :: Python Modules',

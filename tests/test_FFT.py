@@ -12,7 +12,14 @@ from mpiFFT4py.line import R2C as Line_R2C
 from mpiFFT4py import rfft2, rfftn, irfftn, irfft2, fftn, ifftn, irfft, ifft
 from mpiFFT4py.slab import C2C
 
-N = 2**6
+def reset_profile(prof):
+    prof.code_map = {}
+    prof.last_time = {}
+    prof.enable_count = 0
+    for func in prof.functions:
+        prof.add_function(func)
+        
+N = 2**7
 L = array([2*pi, 2*pi, 2*pi])
 ks = (fftfreq(N)*N).astype(int)
 comm = MPI.COMM_WORLD
@@ -270,10 +277,15 @@ def test_FFT_C2C(FFT_C2C):
     #print "Y: ", ty
     #print "X: ", tx
 
-#test_FFT(Slab_R2C(array([N, N, N]), L, MPI, "single", communication='alltoall'))
+#test_FFT(Slab_R2C(array([N, N, N]), L, MPI.COMM_WORLD, "double", communication='alltoall'))
 #test_FFT(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
 #test_FFT2(Line_R2C(array([N, N]), L[:-1], MPI, "single"))
 #test_FFT2_padded(Line_R2C(array([N, N]), L[:-1], MPI, "double"))
-#test_FFT_padded(Slab_R2C(array([N, N, N]), L, MPI, "double", communication='Alltoallw'))
+from collections import defaultdict
+FFT = Slab_R2C(array([N//4, N, N]), L, MPI.COMM_WORLD, "double", communication='Alltoallw', threads=2, planner_effort=defaultdict(lambda: "FFTW_MEASURE"))
+test_FFT_padded(FFT)
+reset_profile(profile)
+test_FFT_padded(FFT)
+
 #test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", communication='Nyquist'))
 #test_FFT_C2C(C2C(array([N, N, N]), L, MPI, "double"))
