@@ -2,29 +2,62 @@
 
 language: python
 
-python:
-    - 2.7    
-    - 3.5
+os: osx
+osx_image: beta-xcode6.1
 
-branches:
-  only:
-    - master
+env:
+  matrix:
+    - CONDA_PY=27
+    - CONDA_PY=34
+    - CONDA_PY=35
 
-sudo: false
+before_install:
+    # Remove homebrew.
+    - brew remove --force $(brew list)
+    - brew cleanup -s
+    - rm -rf $(brew --cache)
 
 install:
-    - wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;      
-    - bash miniconda.sh -b -p $HOME/miniconda
-    - export PATH="$HOME/miniconda/bin:$PATH"
-    - hash -r
-    - conda config --set always_yes yes
-    - conda update -q conda
-    - conda info -a
-    - conda create -q -n test-environment mpi4py scipy pytest Cython
-    - source activate test-environment
-    - python setup.py install
+    - |
+      MINICONDA_URL="https://repo.continuum.io/miniconda"
+      MINICONDA_FILE="Miniconda3-latest-MacOSX-x86_64.sh"
+      curl -L -O "${MINICONDA_URL}/${MINICONDA_FILE}"
+      bash $MINICONDA_FILE -b
+      source /Users/travis/miniconda3/bin/activate root
+      conda config --add channels conda-forge
+      conda config --set show_channel_urls true
+      conda create -q -n test-environment mpi4py scipy pytest Cython
+      source activate test-environment
+      
+script:
+  - conda build conf/conda
+
+
+#language: python
+
+#python:
+    #- 2.7    
+    #- 3.5
+
+#branches:
+  #only:
+    #- master
+
+#sudo: false
+
+#install:
+    #- wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;      
+    #- bash miniconda.sh -b -p $HOME/miniconda
+    #- export PATH="$HOME/miniconda/bin:$PATH"
+    #- hash -r
+    #- conda config --set always_yes yes
+    #- conda update -q conda
+    #- conda info -a
+    #- conda create -q -n test-environment mpi4py scipy pytest Cython
+    #- source activate test-environment
+    #- python setup.py install
     
-script: cd $PWD/tests; mpirun -np 8 py.test
+#script: cd $PWD/tests; mpirun -np 8 py.test
 
 #notifications:
 #  email: false
