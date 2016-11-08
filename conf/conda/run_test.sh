@@ -1,2 +1,2 @@
 cd $SRC_DIR/tests
-mpirun -np $CPU_COUNT py.test
+mpirun -np 8 py.test
