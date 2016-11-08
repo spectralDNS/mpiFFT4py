@@ -18,9 +18,8 @@ dependencies:
       fi
     - conda config --set always_yes yes
     - conda update -q conda
-    - conda config --add channels conda-forge
-    - conda install -y mpi4py scipy pytest Cython conda-build
+    - conda install conda-build
 
 test:
   override:
-    - conda build conf/conda
+    - conda build -c mpi4py -c conda-forge conf/conda
