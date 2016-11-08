@@ -15,8 +15,8 @@ env:
   global:
     # Generated with "anaconda auth --create --name mpifft4py-2016 > token"
     # then "travis encrypt BINSTAR_TOKEN=token --repo spectralDNS/mpiFFT4py"
-    secure: "qiMoDZzQzm0Mudi6vgc/8+HdMYdm9ChsVCjOM7wDm74uY6CYrlfnGREe8BoAKNxRN76m/2BDK/bLPcLPOkus31p1/GT1ykx6e2V/nLWS21f5v7Mua80qOVfu7oDWK/3jfoh4uICbazs8Tz8/UKw0gzksBQqqCucGZ8DvBJoNhLQs22XC05x0dss0ZaHUy9/a5rxC8KPikmEG8mIQn/+B/BfL/oaR6Z1vhF4r/+adB5pQa062sZBshJX75MajFyReSF8a2DiNX8mZXZXZudtVdHr6SGtckf2ta2OROrW2JFMl0+TZqa/f7xy1UXuO9Eh3LaeOQNTM4PGx2qfwi5SbsRcpWRALmM54l5X0y6OdxImsK1mTeUVEVUpE1CileuE6H1iE2aZM5+WtjiADVl0s3kSPkZLyx2Tn7tG40I6q5H28ymaoIZYZLKZc7bPM8+4ANgcr3pfqJO7C59SFs5YotyaFfGl+XpIitrI+c+gNMh2ec7cs0y72Pr1fCCNypA89jxDAO4TlrfnnynAdS54nc4diYouGSTEvny5MwQf+boMAd8vikSgtXzAt51Ora+5pmDVZVAIhWi/qc5YhPiMSiJUlqGd96vuJmBFCx3n0AxT1mSF7A3HBbpTsD+Je6l7spdYOd0LkDeR5enMLFqnb/XnJ4Eb/RI6Sv54XYJzt0Vo="
-    
+    - secure: "qiMoDZzQzm0Mudi6vgc/8+HdMYdm9ChsVCjOM7wDm74uY6CYrlfnGREe8BoAKNxRN76m/2BDK/bLPcLPOkus31p1/GT1ykx6e2V/nLWS21f5v7Mua80qOVfu7oDWK/3jfoh4uICbazs8Tz8/UKw0gzksBQqqCucGZ8DvBJoNhLQs22XC05x0dss0ZaHUy9/a5rxC8KPikmEG8mIQn/+B/BfL/oaR6Z1vhF4r/+adB5pQa062sZBshJX75MajFyReSF8a2DiNX8mZXZXZudtVdHr6SGtckf2ta2OROrW2JFMl0+TZqa/f7xy1UXuO9Eh3LaeOQNTM4PGx2qfwi5SbsRcpWRALmM54l5X0y6OdxImsK1mTeUVEVUpE1CileuE6H1iE2aZM5+WtjiADVl0s3kSPkZLyx2Tn7tG40I6q5H28ymaoIZYZLKZc7bPM8+4ANgcr3pfqJO7C59SFs5YotyaFfGl+XpIitrI+c+gNMh2ec7cs0y72Pr1fCCNypA89jxDAO4TlrfnnynAdS54nc4diYouGSTEvny5MwQf+boMAd8vikSgtXzAt51Ora+5pmDVZVAIhWi/qc5YhPiMSiJUlqGd96vuJmBFCx3n0AxT1mSF7A3HBbpTsD+Je6l7spdYOd0LkDeR5enMLFqnb/XnJ4Eb/RI6Sv54XYJzt0Vo="
+
 before_install:
     # Remove homebrew.
     - brew remove --force $(brew list)
