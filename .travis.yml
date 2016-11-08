@@ -15,7 +15,7 @@ env:
   global:
     # Generated with "token=$(anaconda auth --create --name mpifft4py-2016)"
     # then "travis encrypt BINSTAR_TOKEN=token --repo spectralDNS/mpiFFT4py"
-    - secure: "jw7JDVQQh87gjdPw/W+simM/3NP99JfyOfHp2QLGOlUNViHq8lb6DeaPcCKqcNu63R63ZGD2BN21Tsy1zxfqUEYjZeyIHya/qwAPBWTSbuzI7rvy4JqzgUb/74QpO128oq2APdD0fGFowGV/A4CLSU7ym67U5PRo/598a/Yz2YfmU5ogwaZSc0P061wTTzAsuTEapol52BSQjADbK2ybxw9DefTd/rHPzWyvL60KnvDwa/MYJLVDVAR+2VTjcMXYU740B7iSpaJz8wytyP+RpRDI4sr761wbw/7IIFbZWFeGzMl2WLiWgeGnGRuP/TTJAFfODwaoOKlRZPY+zzNyEu6xuFyi03yvXwGwb+fhJWiClaUcGynYIu/PqyHkexrfPLpsL9SLU5+tq+pDk3nO1EoYGiaG77Oj8bx4dM6PUuDjX0o55zHaSA540NZlDdBE7RxykbF2gQQKZfIcpR0zQwFGKUzQpFRMMVXMsjJrPWQmHPqMRFO5keuSEC5z4FPO53NEy15I0hwiSt1LMJFpo8w5EIO0tUM83AFUXG8zpiYRebxGjVIW4LJOZ4N04V6qh92SUq+4KjOLS0B6HCCiWSjEqYaXapfXXPbhH97Hi4MJf8fCTgSMhMT/AJ71iVM1ryj6TGRdCsQJUKikb4BHX+MTh5Ap7iEhvRMjiCZLYXE="
+    - secure: "c4kiy2clT9zK8RlmYGnYUz8MMiRFGThgmHjlS9DkmxxUBB/WQyisSDY54H7Mr/8ptcf6/2p8H0yJnJXvPWIuy2XlHKhKakU3vNLFN5hpe8fQAXpurmEaK00PgWioX0DPXW0sPpT6YBxDNyc1MOucQm8NOeygdFpPnzgeswBMIvfFwR8fJV2EIpPhA9NeZS3rcS7jxn+KPpbZ0P5StvO2Wwo5h1HFxKpMokRkZ/aUxJR9zFzqN1sebF/e+Ut+C6EerHA3iNZOROmf8E3LKEi+TqJoWBa2NjHwxPwxjaNwEaCM5jTLJypweig9GzOMuQsZTGXnAlaC9WQNp/2P0Pa6Um72S87QZ4yEcOSN2aHyl/yMqVuefObqfcOpYtX8LOKc0K+obvYyFqqXlpztDJ6PEvuTEDmT0lPjpgsuUCbwrUf6wN2hjYIP1Bv5uFcC6BzL8P7RDZmVRWzNYkS+qk3XLLlNdNuhd6aAh2t/FuGTKivJotflFRxHpswQfCvthV8u/x1vNZH2M/PBKjJHZn+7IzOjrZ+szv5d7XsZ2QT3IqTR+pCJLsEdO3ht72MudKL9GUhqJ9FPcGuOi+NcU2izOpyxnZOVu/Ycq7c/MMpCnzuDtCz4hN9Uhh92ADF7fmaLdOibvwmbA3mwI8hXzbs3Cn9cTIeG5MGKMvz+iEG4CRY="
     
 before_install:
     # Remove homebrew.
@@ -42,10 +42,5 @@ script:
 
 after_success:
   #- cp /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2 .
-  - export BINSTAR_TOKEN=${BINSTAR_TOKEN}
-<<<<<<< HEAD
   - anaconda -t $BINSTAR_TOKEN upload -u spectralDNS -c main /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2
   - upload_or_check_non_existence ./conf/conda mikaem --channel main || exit 1
-=======
-  - upload_or_check_non_existence ./conf/conda mikaem --channel main
->>>>>>> parent of 209e8c8... Testing binstar_token2
