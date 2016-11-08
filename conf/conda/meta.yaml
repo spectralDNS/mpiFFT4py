@@ -10,6 +10,7 @@ build:
 
 requirements:
   build:
+    - toolchain
     - python
     - cython
     - numpy
@@ -20,8 +21,11 @@ requirements:
     - scipy
     - mpi4py
     - cython
+    - pyfftw
 
 test:
-    requires:
-      - pytest
+  requires:
+    - pytest
 
+  imports:
+    - mpiFFT4py
