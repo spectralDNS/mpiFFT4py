@@ -25,8 +25,9 @@ install:
       curl -L -O "${MINICONDA_URL}/${MINICONDA_FILE}"
       bash $MINICONDA_FILE -b
       source /Users/travis/miniconda3/bin/activate root
-      conda config --set show_channel_urls true --set binstar_upload true
+      conda config --set show_channel_urls true --set anaconda_upload true
       conda install conda-build
+      conda install anaconda-client
       
 script:
   - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
