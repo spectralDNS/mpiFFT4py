@@ -42,5 +42,5 @@ script:
 
 after_success:
   #- cp /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2 .
-  - anaconda -t $BINSTAR_TOKEN upload -u spectralDNS -c main /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2
+  - anaconda -t $BINSTAR_TOKEN upload --force /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2 -u spectralDNS -c main
   - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
