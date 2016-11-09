@@ -19,8 +19,10 @@ dependencies:
     - conda config --set always_yes yes
     - conda update -q conda
     - conda config --add channels conda-forge
-    - conda install -y mpi4py scipy pytest Cython conda-build
+    - conda install --yes --quiet conda-forge-build-setup
+    - source run_conda_forge_build_setup
 
 test:
   override:
-    - conda build conf/conda
+    - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
+    - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
