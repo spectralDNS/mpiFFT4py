@@ -6,7 +6,7 @@ source:
   git_url: ../../
 
 build:
-  number: 16
+  number: 17
 
 requirements:
   build:
@@ -20,8 +20,8 @@ requirements:
     - scipy
     - mpi4py
     - cython
+    - pyfftw
 
 test:
-    requires:
-      - pytest
-
+  requires:
+    - pytest
