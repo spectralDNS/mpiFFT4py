@@ -26,7 +26,5 @@ test:
   override:
     - conda build -c mpi4py -c conda-forge conf/conda
     - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
-    - conda create --name py34 python=3.4
-    - source activate py34
-    - conda build -c mpi4py -c conda-forge conf/conda
+    - conda build --python 3.4 -c mpi4py -c conda-forge conf/conda
     - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
