@@ -13,9 +13,9 @@ env:
     - CONDA_PY=34
 
   global:
-    # Generated with "anaconda auth --create --name mpifft4py-2016 > token"
-    # then "travis encrypt BINSTAR_TOKEN=token --repo spectralDNS/mpiFFT4py"
-    - secure: "GivCFWhYY2licu9D7j5Mc5lHR2bEuY+R1ARub0M5C6xpFkZ5FhZxaI9A31Pwyur14du5rlg285cVsDDJqk0MpeULx4FCw55mqQSZ139s+0UpFeB+1OKPi3MRUbLqLE4Fr83VdedkvPNdYPn1/T4F3yF+RUM332JtnRqZtG10/oCoBzygz9n9+2nPWGOByHp7yg+oPoTyaiJI+DVmbzeflShvaJ9GRBfPgIcZR2E+5KzvaPfL/Ii5GVQBUDr5JDilBlLgu7uouBr5BP7rt0eCoZ3+1z8+yxdynMEM9u6OyseVT9T++eNWDKPfpSq90uCsby7VX+Ut1JmyusMDvT8jYqTt2LHkaaRmUdTZXG+TX40f8XhcpBOz30wNnNOOmubWoS/JoqRyr1Yn1J73y+2me/xEUChe9W4D/EsOPOvhaSknojxjHC4F2pWrZBt49rRXQ5gYmD5bJRwB6ANyzDc2cVmh8Cl4vvV+G28CxMndbHufchbpSR5XB3BsSvMD82j4rASfIHeKRqf3/AyxNMDGZVo//NhktMTtvPy5mHSmyfVpi+i064GsK0bPUYPtEW1p6C4NKEnLsOM0bNcmqi6ebuSKovJ7voMQlx9S3PjfVeLQiLApZrtpm+owoJHw3kx7ThneMkDW08DcbzKxprhN2zEunw4NASDMCG6DV9KhOQ0="
+    # Generated with "anaconda auth --create --name mpifft4py-2016"
+    # then "travis encrypt BINSTAR_TOKEN=<token> --repo spectralDNS/mpiFFT4py"
+    - secure: "roWIiQ0JA8ONSvbtDU08vJJC45kIzIleOgrQvlqmsvDeBqqfqtdSJFoHd2aSsrtgxNKdF7GSbIzbqWWCEVmrvpZc2rAqHg3/Hsc5OssrpAutsNvYT1bxgYlvTvKIIUX4ivXH3WGq+CCh7q1qn2WCHt1f4mCQ+lZ/7neAX67ZuLMnnZmA8jXCvKSFKnhqVzxRdnTiXnu83+PsMt5h632J/VHaJiWoq9/aYJsvgmV3mui58IKEG/fL6I7guOAkoONloYEOWYjS6hvJEciC62uO15uFW86/uoB7jWn7vsK5GNxwaJxBZe5qu15uiVNzEbXs7jsl1M6aEa/QEbVh/aWq55GR5IwBlrXRulVca9GXtNUN8McYGAGQHE1WWRXpkovKPLpZVXn/Vm4D4Me4sUPGn4g9fBk10WUcx0QZfIi4rz6u/odYvzhasKeCdCWSxEEESUTXzZGp2G5lSiLb6LWSYRGOnXiF6WtlUSlxO67OOryvRe2jOV8ll/tL/ovtrEW5piomvAXkMj+LAxUsQ7rx+t3dukuKmc72GOnQy6psadMVP4awZ0Tl/ItnXtNDcsFxwngFI7zYDKqNG61lYzyCNlMD8Jnp3CMYj3BjZn48B+HVE784TaK9A6MB7pxpOs7CY5mpVinWzl0bs6sH6WSr5C3kZ1RGuvdf+uutHtX4qbs="
 
 before_install:
     # Remove homebrew.
@@ -39,9 +39,9 @@ install:
       source run_conda_forge_build_setup
       
 script:
-  - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
+    - conda build -c mpi4py -c conda-forge -c spectralDNS conf/conda
 
 after_success:
-  #- cp /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2 .
-  - anaconda -t $BINSTAR_TOKEN upload --force /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2 -u spectralDNS -c main
-  - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
+    #- cp /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2 .
+    - anaconda -t $BINSTAR_TOKEN upload --force /Users/travis/miniconda3/conda-bld/osx-64/*.tar.bz2 -u spectralDNS -c main
+    - upload_or_check_non_existence ./conf/conda spectralDNS --channel main || exit 1
