@@ -15,7 +15,7 @@ env:
   global:
     # Generated with "anaconda auth --create --name mpifft4py-2016 > token"
     # then "travis encrypt BINSTAR_TOKEN=token --repo spectralDNS/mpiFFT4py"
-    - secure: "qiMoDZzQzm0Mudi6vgc/8+HdMYdm9ChsVCjOM7wDm74uY6CYrlfnGREe8BoAKNxRN76m/2BDK/bLPcLPOkus31p1/GT1ykx6e2V/nLWS21f5v7Mua80qOVfu7oDWK/3jfoh4uICbazs8Tz8/UKw0gzksBQqqCucGZ8DvBJoNhLQs22XC05x0dss0ZaHUy9/a5rxC8KPikmEG8mIQn/+B/BfL/oaR6Z1vhF4r/+adB5pQa062sZBshJX75MajFyReSF8a2DiNX8mZXZXZudtVdHr6SGtckf2ta2OROrW2JFMl0+TZqa/f7xy1UXuO9Eh3LaeOQNTM4PGx2qfwi5SbsRcpWRALmM54l5X0y6OdxImsK1mTeUVEVUpE1CileuE6H1iE2aZM5+WtjiADVl0s3kSPkZLyx2Tn7tG40I6q5H28ymaoIZYZLKZc7bPM8+4ANgcr3pfqJO7C59SFs5YotyaFfGl+XpIitrI+c+gNMh2ec7cs0y72Pr1fCCNypA89jxDAO4TlrfnnynAdS54nc4diYouGSTEvny5MwQf+boMAd8vikSgtXzAt51Ora+5pmDVZVAIhWi/qc5YhPiMSiJUlqGd96vuJmBFCx3n0AxT1mSF7A3HBbpTsD+Je6l7spdYOd0LkDeR5enMLFqnb/XnJ4Eb/RI6Sv54XYJzt0Vo="
+    - secure: "GivCFWhYY2licu9D7j5Mc5lHR2bEuY+R1ARub0M5C6xpFkZ5FhZxaI9A31Pwyur14du5rlg285cVsDDJqk0MpeULx4FCw55mqQSZ139s+0UpFeB+1OKPi3MRUbLqLE4Fr83VdedkvPNdYPn1/T4F3yF+RUM332JtnRqZtG10/oCoBzygz9n9+2nPWGOByHp7yg+oPoTyaiJI+DVmbzeflShvaJ9GRBfPgIcZR2E+5KzvaPfL/Ii5GVQBUDr5JDilBlLgu7uouBr5BP7rt0eCoZ3+1z8+yxdynMEM9u6OyseVT9T++eNWDKPfpSq90uCsby7VX+Ut1JmyusMDvT8jYqTt2LHkaaRmUdTZXG+TX40f8XhcpBOz30wNnNOOmubWoS/JoqRyr1Yn1J73y+2me/xEUChe9W4D/EsOPOvhaSknojxjHC4F2pWrZBt49rRXQ5gYmD5bJRwB6ANyzDc2cVmh8Cl4vvV+G28CxMndbHufchbpSR5XB3BsSvMD82j4rASfIHeKRqf3/AyxNMDGZVo//NhktMTtvPy5mHSmyfVpi+i064GsK0bPUYPtEW1p6C4NKEnLsOM0bNcmqi6ebuSKovJ7voMQlx9S3PjfVeLQiLApZrtpm+owoJHw3kx7ThneMkDW08DcbzKxprhN2zEunw4NASDMCG6DV9KhOQ0="
 
 before_install:
     # Remove homebrew.
@@ -34,6 +34,7 @@ install:
       conda config --add channels conda-forge
       #conda install conda-build
       #conda install anaconda-client
+      conda update -q conda
       conda install --yes --quiet conda-forge-build-setup
       source run_conda_forge_build_setup
       
