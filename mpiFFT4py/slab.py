@@ -56,13 +56,13 @@ class R2C(object):
         L - NumPy array([Lx, Ly, Lz]) The actual size of the real mesh
         comm - The MPI communicator object
         precision - "single" or "double"
-        communication - Method used for communication ('alltoall', 'Sendrecv_replace', 'Alltoallw')
+        communication - Method used for communication ('Alltoall', 'Sendrecv_replace', 'Alltoallw')
         padsize - Padsize when dealias = 3/2-rule is used
         threads - Number of threads used by FFTs
         planner_effort - Planner effort used by FFTs (e.g., "FFTW_MEASURE", "FFTW_PATIENT", "FFTW_EXHAUSTIVE")
                          Give as defaultdict, with keys representing transform (e.g., fft, ifft)
 
-    The transform is real to complex
+    The forward transform is real to complex and the inverse is complex to real
     """
     def __init__(self, N, L, comm, precision,
                  communication="Alltoallw",
@@ -201,6 +201,7 @@ class R2C(object):
     #@profile
     def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
+        
         Need to do ifft in reversed order of fft
 
         dealias = "3/2-rule"
@@ -261,7 +262,7 @@ class R2C(object):
             # Do first owned direction
             Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
 
-            if self.communication == 'alltoall':
+            if self.communication == 'Alltoall':
                 Uc_mpi = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
 
                 ## Communicate all values
@@ -378,7 +379,7 @@ class R2C(object):
 
             Uc_hat = self.work_arrays[(fu, 0, False)]
 
-            if self.communication == 'alltoall':
+            if self.communication == 'Alltoall':
                 # Intermediate work arrays required for transform
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
                 U_mpi = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
@@ -530,7 +531,7 @@ class C2C(R2C):
         L - NumPy array([Lx, Ly, Lz]) The actual size of the real mesh
         comm - The MPI communicator object
         precision - "single" or "double"
-        communication - Method used for communication ('alltoall', 'Sendrecv_replace')
+        communication - Method used for communication ('Alltoall', 'Sendrecv_replace')
         padsize - Padsize when dealias = 3/2-rule is used
         threads - Number of threads used by FFTs
         planner_effort - Planner effort used by FFTs (e.g., "FFTW_MEASURE", "FFTW_PATIENT", "FFTW_EXHAUSTIVE")
@@ -539,7 +540,7 @@ class C2C(R2C):
     The transform is complex to complex
     """
     def __init__(self, N, L, comm, precision,
-                 communication="alltoall",
+                 communication="Alltoall",
                  padsize=1.5,
                  threads=1,
                  planner_effort=defaultdict(lambda: "FFTW_MEASURE")):
@@ -630,7 +631,7 @@ class C2C(R2C):
             Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads,
                           planner_effort=self.planner_effort['ifft'])
 
-            if self.communication == 'alltoall':
+            if self.communication == 'Alltoall':
                 # Communicate all values
                 self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
                 Uc_hatT[:] = np.rollaxis(Uc_mpi, 1).reshape(Uc_hatT.shape)
@@ -720,7 +721,7 @@ class C2C(R2C):
             return fu
 
         if not dealias == '3/2-rule':
-            if self.communication == 'alltoall':
+            if self.communication == 'Alltoall':
                 # Intermediate work arrays required for transform
                 Uc_mpi  = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
