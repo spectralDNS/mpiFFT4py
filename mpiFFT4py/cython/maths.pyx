@@ -20,12 +20,12 @@ def dealias_filter(np.ndarray[complex_t, ndim=3] fu,
 
 def transpose_Uc(np.ndarray[complex_t, ndim=3] Uc_hatT,
                  np.ndarray[complex_t, ndim=4] U_mpi,
-                 int num_processes, int Np, int Nf):    
+                 int num_processes, int Np0, int Np1, int Nf):    
     cdef unsigned int i, j, k, l, kk
     for i in xrange(num_processes): 
-        for j in xrange(Np):
-            for k in xrange(i*Np, (i+1)*Np):
-                kk = k-i*Np
+        for j in xrange(Np0):
+            for k in xrange(i*Np1, (i+1)*Np1):
+                kk = k-i*Np1
                 for l in xrange(Nf):
                     Uc_hatT[j, k, l] = U_mpi[i, j, kk, l]
     return Uc_hatT

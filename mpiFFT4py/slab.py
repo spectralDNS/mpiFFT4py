@@ -269,7 +269,7 @@ class R2C(object):
                 self.comm.Alltoall([Uc_hat, self.mpitype], [Uc_mpi, self.mpitype])
                 #Uc_hatT = np.rollaxis(Uc_mpi, 1).reshape(self.complex_shape_T())
                 Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
-                Uc_hatT = transpose_Uc(Uc_hatT, Uc_mpi, self.num_processes, self.Np[1], self.Nf)
+                Uc_hatT = transpose_Uc(Uc_hatT, Uc_mpi, self.num_processes, self.Np[0], self.Np[1], self.Nf)
 
                 #self.comm.Alltoall(MPI.IN_PLACE, [Uc_hat, self.mpitype])
                 #Uc_hatT = np.rollaxis(Uc_hat.reshape((self.num_processes, self.Np[0], self.Np[1], self.Nf)), 1).reshape(self.complex_shape_T())
@@ -394,7 +394,7 @@ class R2C(object):
                 self.comm.Alltoall([U_mpi, self.mpitype], [Uc_hat, self.mpitype])
 
                 ## Transform data to align with x-direction
-                #U_mpi = transpose_Umpi(U_mpi, Uc_hatT, self.num_processes, self.Np[1], self.Nf)
+                #U_mpi = transpose_Umpi(U_mpi, Uc_hatT, self.num_processes, self.Np[0], self.Np[1], self.Nf)
 
                 ## Communicate all values
                 #self.comm.Alltoall([U_mpi, self.mpitype], [fu, self.mpitype])
@@ -447,12 +447,12 @@ class R2C(object):
             # Copy with truncation
             Upad_hat1 = R2C.copy_from_padded(Upad_hat3, Upad_hat1, self.N, 1)
 
-            if not self.communication == 'Alltoallw':
+            if self.communication == 'Alltoall':
                 # Transpose and commuincate data
                 Upad_hat0[:] = np.rollaxis(Upad_hat1.reshape(self.complex_shape_padded_I()), 1).reshape(Upad_hat0.shape)
                 self.comm.Alltoall(MPI.IN_PLACE, [Upad_hat0, self.mpitype])
 
-            else:
+            elif self.communication == 'Alltoallw':
                 if len(self._subarraysA_pad) == 0:
                     self._subarraysA_pad, self._subarraysB_pad, self._counts_displs = self.get_subarrays(padsize=self.padsize)
 
@@ -804,12 +804,12 @@ class C2C(R2C):
         return fu
 
 
-#def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np, Nf):
+#def transpose_Uc(Uc_hatT, U_mpi, num_processes, Np0, Np1, Nf):
     #for i in xrange(num_processes):
-        #Uc_hatT[:, i*Np:(i+1)*Np] = U_mpi[i]
+        #Uc_hatT[:, i*Np1:(i+1)*Np1] = U_mpi[i]
     #return Uc_hatT
 
-#def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np, Nf):
+#def transpose_Umpi(U_mpi, Uc_hatT, num_processes, Np0, Np1, Nf):
     #for i in xrange(num_processes):
-        #U_mpi[i] = Uc_hatT[:, i*Np:(i+1)*Np]
+        #U_mpi[i] = Uc_hatT[:, i*Np1:(i+1)*Np1]
     #return U_mpi

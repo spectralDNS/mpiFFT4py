@@ -126,7 +126,7 @@ def transform_Uc_xy(Uc_hat_x, Uc_hat_y, P):
 def transform_Uc_yx(Uc_hat_y, Uc_hat_x, P):
     sy = Uc_hat_y.shape
     sx = Uc_hat_x.shape
-    Uc_hat_y[:] = np.rollaxis(Uc_hat_x.reshape((P, sx[0]/P, sx[1], sx[2])), 1).reshape(sy)
+    Uc_hat_y[:] = np.rollaxis(Uc_hat_x.reshape((P, sx[0]//P, sx[1], sx[2])), 1).reshape(sy)
     return Uc_hat_y
 
 def transform_Uc_yz(Uc_hat_y, Uc_hat_z, P):
@@ -420,17 +420,33 @@ class R2CY(object):
                 # Transform to x
                 Uc_hat_xp = transform_Uc_xy(Uc_hat_xp, Uc_hat_y, self.P2)
 
+                ###### In-place
+                ## Communicate in xz-plane and do fft in x-direction
+                #self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_xp, self.mpitype])
+                #Uc_hat_xp[:] = ifft(Uc_hat_xp, axis=0, threads=self.threads,
+                                    #planner_effort=self.planner_effort['ifft'])
+
+                #Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]//2]
+
+                ## Communicate and transform in xy-plane all but k=N/2
+                #self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+
+                ####### Not in-place
                 # Communicate in xz-plane and do fft in x-direction
-                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_xp, self.mpitype])
-                Uc_hat_xp[:] = ifft(Uc_hat_xp, axis=0, threads=self.threads,
+                Uc_hat_xp2 = self.work_arrays[((N[0], N2[1], N1f), self.complex, 1, False)]
+                self.comm1.Alltoall([Uc_hat_xp, self.mpitype], [Uc_hat_xp2, self.mpitype])
+                Uc_hat_xp[:] = ifft(Uc_hat_xp2, axis=0, threads=self.threads,
                                     planner_effort=self.planner_effort['ifft'])
-
-                Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]//2]
-
+                
+                Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 1, False)]
+                Uc_hat_x2[:] = Uc_hat_xp[:, :, :N1[2]//2]
+                
                 # Communicate and transform in xy-plane all but k=N/2
-                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                self.comm0.Alltoall([Uc_hat_x2, self.mpitype], [Uc_hat_x, self.mpitype])
+                #########################
+                
                 Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_x, self.P1)
-
+                
                 xy_plane[:] = Uc_hat_xp[:, :, -1]
                 self.comm0.Scatter(xy_plane, xy_recv, root=self.P1-1)
                 Uc_hat_z[:, :, -1] = xy_recv
@@ -630,7 +646,7 @@ class R2CY(object):
 
                 # Additional work arrays
                 Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 0)]
-                Uc_hat_xr2= self.work_arrays[((N[0], N2[1], N1f), self.complex, 0)]
+                Uc_hat_xr2= self.work_arrays[((N[0], N2[1], N1f), self.complex, 1)]
                 xy_plane  = self.work_arrays[((N[0], N2[1]), self.complex, 0)]
                 xy_plane2 = self.work_arrays[((N[0]//2+1, N2[1]), self.complex, 0)]
                 xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0)]
@@ -645,20 +661,29 @@ class R2CY(object):
                 # Transform to x direction neglecting k=N/2 (Nyquist)
                 Uc_hat_x = transform_Uc_xz(Uc_hat_x, Uc_hat_z, self.P1)
 
+                # In-place
                 # Communicate and do fft in x-direction
-                self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
-                Uc_hat_x[:] = fft(Uc_hat_x, axis=0, threads=self.threads,
-                                  planner_effort=self.planner_effort['fft'])
+                #self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
+                #Uc_hat_x[:] = fft(Uc_hat_x, axis=0, threads=self.threads,
+                                  #planner_effort=self.planner_effort['fft'])
+                
+                # Not in-place
+                Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 1, False)]
+                self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])
+                Uc_hat_x = fft(Uc_hat_x2, Uc_hat_x, axis=0, threads=self.threads,
+                               planner_effort=self.planner_effort['fft'])
+                ################
+                
                 Uc_hat_xr2[:, :, :N1[2]//2] = Uc_hat_x[:]
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
                 if self.comm0_rank == 0:
-                    N = self.N[0]
+                    M = N[0]
                     xy_plane[:] = Uc_hat_x[:, :, 0]
-                    xy_plane2[:] = np.vstack((xy_plane[0].real, 0.5*(xy_plane[1:N/2]+np.conj(xy_plane[:N/2:-1])), xy_plane[N/2].real))
-                    Uc_hat_xr2[:, :, 0] = np.vstack((xy_plane2, np.conj(xy_plane2[(N/2-1):0:-1])))
-                    xy_plane2[:] = np.vstack((xy_plane[0].imag, -0.5*1j*(xy_plane[1:N/2]-np.conj(xy_plane[:N/2:-1])), xy_plane[N/2].imag))
-                    xy_plane[:] = np.vstack((xy_plane2, np.conj(xy_plane2[(N/2-1):0:-1])))
+                    xy_plane2[:] = np.vstack((xy_plane[0].real, 0.5*(xy_plane[1:M//2]+np.conj(xy_plane[:M//2:-1])), xy_plane[M//2].real))
+                    Uc_hat_xr2[:, :, 0] = np.vstack((xy_plane2, np.conj(xy_plane2[(M//2-1):0:-1])))
+                    xy_plane2[:] = np.vstack((xy_plane[0].imag, -0.5*1j*(xy_plane[1:M//2]-np.conj(xy_plane[:M//2:-1])), xy_plane[M//2].imag))
+                    xy_plane[:] = np.vstack((xy_plane2, np.conj(xy_plane2[(M//2-1):0:-1])))
                     self.comm0.Send([xy_plane, self.mpitype], dest=self.P1-1, tag=77)
 
                 if self.comm0_rank == self.P1-1:
@@ -666,8 +691,12 @@ class R2CY(object):
                     Uc_hat_xr2[:, :, -1] = xy_plane
 
                 # Communicate and transform to final y-direction
-                self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_xr2, self.mpitype])
-                Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr2, self.P2)
+                #self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_xr2, self.mpitype])
+                #Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr2, self.P2)
+                # Not in-place
+                Uc_hat_xr3 = self.work_arrays[((N[0], N2[1], N1f), self.complex, 2)]
+                self.comm1.Alltoall([Uc_hat_xr2, self.mpitype], [Uc_hat_xr3, self.mpitype])
+                Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr3, self.P2)
 
                 # Do fft for last direction
                 fu = fft(Uc_hat_y, fu, axis=1, threads=self.threads,

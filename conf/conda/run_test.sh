@@ -1,2 +1,2 @@
 cd $SRC_DIR/tests
-mpirun -np 8 py.test
+mpirun -np 4 py.test

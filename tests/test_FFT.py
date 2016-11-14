@@ -25,10 +25,10 @@ ks = (fftfreq(N)*N).astype(int)
 comm = MPI.COMM_WORLD
 
 if comm.Get_size() >= 4:
-    params = ("pencilsys", "pencilsyd", "pencilnys", "pencilnyd", 
-              "pencilsxd", "pencilsxs", "pencilnxd", "pencilnxs", 
-              "pencilaxd", "pencilaxs", "pencilayd", "pencilays",
-              "slabas", "slabad", "slabws", "slabwd")
+    params = ("slabas", "slabad", "slabws", "slabwd",
+              "pencilsys", "pencilsyd", "pencilnys", "pencilnyd",
+              "pencilsxd", "pencilsxs", "pencilnxd", "pencilnxs",
+              "pencilaxd", "pencilaxs", "pencilayd", "pencilays")
 
 else:
     params = ("slabas", "slabad", "slabws", "slabwd")
@@ -40,37 +40,38 @@ def FFT(request):
     if request.param[:3] == "pen":
         communication = {"s": "Alltoall", "n": "AlltoallN", "a": "Alltoallw"}[request.param[-3]]
         alignment = request.param[-2].upper()
-        return Pencil_R2C(array([N, N, N]), L, comm, prec, communication=communication, alignment=alignment)
+        return Pencil_R2C(array([N, 2*N, 4*N]), L, comm, prec, communication=communication, alignment=alignment)
     else:
         communication = 'Alltoall' if request.param[-2] == 'a' else 'Alltoallw'
-        return Slab_R2C(array([N, N, N]), L, comm, prec, communication=communication)
+        return Slab_R2C(array([N, 2*N, 4*N]), L, comm, prec, communication=communication)
         
 @pytest.fixture(params=("lines", "lined"), scope='module')
 def FFT2(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
-    return Line_R2C(array([N, N]), L[:-1], comm, prec)
+    return Line_R2C(array([N, 2*N]), L[:-1], comm, prec)
 
 
 @pytest.fixture(params=("slabd", "slabs"), scope='module')
 def FFT_C2C(request):
     prec = {"s": "single", "d":"double"}[request.param[-1]]
-    return C2C(array([N, N, N]), L, comm, prec)
+    return C2C(array([N, 2*N, 4*N]), L, comm, prec)
     
 #@profile    
 def test_FFT(FFT):
+    N = FFT.N
     if FFT.rank == 0:
-        A = random((N, N, N)).astype(FFT.float)
+        A = random(N).astype(FFT.float)
         if FFT.communication == 'AlltoallN':
             C = empty(FFT.global_complex_shape(), dtype=FFT.complex)
             C = rfftn(A, C, axes=(0,1,2))
             C[:, :, -1] = 0  # Remove Nyquist frequency
             A = irfftn(C, A, axes=(0,1,2))
-        B2 = zeros((N, N, N/2+1), dtype=FFT.complex)
+        B2 = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
         B2 = rfftn(A, B2, axes=(0,1,2))
 
     else:
-        A = zeros((N, N, N), dtype=FFT.float)
-        B2 = zeros((N, N, N/2+1), dtype=FFT.complex)
+        A = zeros(N, dtype=FFT.float)
+        B2 = zeros(FFT.global_complex_shape(), dtype=FFT.complex)
 
     atol, rtol = (1e-10, 1e-8) if FFT.float is float64 else (5e-7, 1e-4)
     FFT.comm.Bcast(A, root=0)
@@ -90,11 +91,12 @@ def test_FFT(FFT):
     #assert allclose(a, A[FFT.real_local_slice()], rtol, atol)
 
 def test_FFT2(FFT2):
+    N = FFT2.N
     if FFT2.rank == 0:
-        A = random((N, N)).astype(FFT2.float)        
+        A = random(N).astype(FFT2.float)        
         
     else:
-        A = zeros((N, N), dtype=FFT2.float)
+        A = zeros(N, dtype=FFT2.float)
 
     atol, rtol = (1e-10, 1e-8) if FFT2.float is float64 else (5e-7, 1e-4)
     FFT2.comm.Bcast(A, root=0)
@@ -110,10 +112,10 @@ def test_FFT2(FFT2):
 
 def test_FFT2_padded(FFT2):
     FFT = FFT2
-    prec = "single" if isinstance(FFT.float, np.float32) else "double"
-    FFT_SELF = Line_R2C(FFT.N, FFT.L, MPI.COMM_SELF, prec)
-
     N = FFT.N
+    prec = "single" if isinstance(FFT.float, np.float32) else "double"
+    FFT_SELF = Line_R2C(N, FFT.L, MPI.COMM_SELF, prec)
+
     if FFT.rank == 0:
         A = random(N).astype(FFT.float)
         C = zeros((FFT.global_complex_shape()), dtype=FFT.complex)
@@ -284,8 +286,8 @@ def test_FFT_C2C(FFT_C2C):
     #print "Y: ", ty
     #print "X: ", tx
 
-#test_FFT(Slab_R2C(array([N, N, N]), L, MPI.COMM_WORLD, "double", communication='Alltoall'))
-#test_FFT(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoallw'))
+#test_FFT(Slab_R2C(array([N, 2*N, 4*N]), L, MPI.COMM_WORLD, "double", communication='Alltoall'))
+#test_FFT(Pencil_R2C(array([N, N, N], dtype=int), L, MPI.COMM_WORLD, "double", alignment="Y", communication='Alltoall'))
 #test_FFT2(Line_R2C(array([N, N]), L[:-1], MPI, "single"))
 #test_FFT2_padded(Line_R2C(array([N, N]), L[:-1], MPI, "double"))
 #from collections import defaultdict
