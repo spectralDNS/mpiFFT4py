@@ -23,11 +23,15 @@ To install using Anaconda, you may either compile it yourselves using (from the 
     conda build conf/conda
     conda install mpiFFT4py --use-local
     
-or use precompiled binaries in the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud
+or use precompiled binaries in the[*conda-forge*](https://anaconda.org/conda-forge/mpifft4py) or the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud
 
-    conda install -c conda-forge -c spectralDNS mpiFFT4py
+    conda install -c conda-forge mpifft4py
 
-There are binaries compiled for both OSX and linux, using either Python 2.7 or 3.4.
+or
+
+    conda install -c spectralDNS -c conda-forge mpifft4py
+
+There are binaries compiled for both OSX and linux, and several versions of Python. Note that the spectralDNS channel contains bleeding-edge versions of the Software, whereas conda-forge is more stable.
 
 Authors
 -------
