@@ -435,8 +435,8 @@ class R2CY(object):
                 # Communicate in xz-plane and do fft in x-direction
                 Uc_hat_xp2 = self.work_arrays[((N[0], N2[1], N1f), self.complex, 1, False)]
                 self.comm1.Alltoall([Uc_hat_xp, self.mpitype], [Uc_hat_xp2, self.mpitype])
-                Uc_hat_xp[:] = ifft(Uc_hat_xp2, axis=0, threads=self.threads,
-                                    planner_effort=self.planner_effort['ifft'])
+                Uc_hat_xp = ifft(Uc_hat_xp2, Uc_hat_xp, axis=0, threads=self.threads,
+                                 planner_effort=self.planner_effort['ifft'])
                 
                 Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 1, False)]
                 Uc_hat_x2[:] = Uc_hat_xp[:, :, :N1[2]//2]
@@ -668,7 +668,7 @@ class R2CY(object):
                                   #planner_effort=self.planner_effort['fft'])
                 
                 # Not in-place
-                Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 1, False)]
+                Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 2, False)]
                 self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])
                 Uc_hat_x = fft(Uc_hat_x2, Uc_hat_x, axis=0, threads=self.threads,
                                planner_effort=self.planner_effort['fft'])
@@ -694,7 +694,7 @@ class R2CY(object):
                 #self.comm1.Alltoall(MPI.IN_PLACE, [Uc_hat_xr2, self.mpitype])
                 #Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr2, self.P2)
                 # Not in-place
-                Uc_hat_xr3 = self.work_arrays[((N[0], N2[1], N1f), self.complex, 2)]
+                Uc_hat_xr3 = self.work_arrays[((N[0], N2[1], N1f), self.complex, 3)]
                 self.comm1.Alltoall([Uc_hat_xr2, self.mpitype], [Uc_hat_xr3, self.mpitype])
                 Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_xr3, self.P2)
 
@@ -1259,12 +1259,12 @@ class R2CX(R2CY):
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
                 if self.comm1_rank == 0:
-                    N = self.N[1]
+                    M = self.N[1]
                     xy_plane[:] = Uc_hat_y3[:, :, 0]
-                    xy_plane2[:] = np.vstack((xy_plane_T[0].real, 0.5*(xy_plane_T[1:N/2]+np.conj(xy_plane_T[:N/2:-1])), xy_plane_T[N/2].real))
-                    Uc_hat_y2[:, :, 0] = (np.vstack((xy_plane2, np.conj(xy_plane2[(N/2-1):0:-1])))).transpose((1, 0))
-                    xy_plane2[:] = np.vstack((xy_plane_T[0].imag, -0.5*1j*(xy_plane_T[1:N/2]-np.conj(xy_plane_T[:N/2:-1])), xy_plane_T[N/2].imag))
-                    xy_plane_T[:] = np.vstack((xy_plane2, np.conj(xy_plane2[(N/2-1):0:-1])))
+                    xy_plane2[:] = np.vstack((xy_plane_T[0].real, 0.5*(xy_plane_T[1:M//2]+np.conj(xy_plane_T[:M//2:-1])), xy_plane_T[M//2].real))
+                    Uc_hat_y2[:, :, 0] = (np.vstack((xy_plane2, np.conj(xy_plane2[(M//2-1):0:-1])))).transpose((1, 0))
+                    xy_plane2[:] = np.vstack((xy_plane_T[0].imag, -0.5*1j*(xy_plane_T[1:M//2]-np.conj(xy_plane_T[:M//2:-1])), xy_plane_T[M//2].imag))
+                    xy_plane_T[:] = np.vstack((xy_plane2, np.conj(xy_plane2[(M//2-1):0:-1])))
                     self.comm1.Send([xy_plane_T, self.mpitype], dest=self.P2-1, tag=77)
 
                 if self.comm1_rank == self.P2-1:
@@ -1387,12 +1387,12 @@ class R2CX(R2CY):
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
                 if self.comm1_rank == 0:
-                    N = self.N[1]
+                    M = self.N[1]
                     xy_plane[:] = Uc_pad_hat_y[:, :, 0]
-                    xy_plane2[:] = np.vstack((xy_plane_T[0].real, 0.5*(xy_plane_T[1:N/2]+np.conj(xy_plane_T[:N/2:-1])), xy_plane_T[N/2].real))
-                    Uc_pad_hat_y2[:, :, 0] = (np.vstack((xy_plane2, np.conj(xy_plane2[(N/2-1):0:-1])))).transpose((1, 0))
-                    xy_plane2[:] = np.vstack((xy_plane_T[0].imag, -0.5*1j*(xy_plane_T[1:N/2]-np.conj(xy_plane_T[:N/2:-1])), xy_plane_T[N/2].imag))
-                    xy_plane_T[:] = np.vstack((xy_plane2, np.conj(xy_plane2[(N/2-1):0:-1])))
+                    xy_plane2[:] = np.vstack((xy_plane_T[0].real, 0.5*(xy_plane_T[1:M//2]+np.conj(xy_plane_T[:M//2:-1])), xy_plane_T[M//2].real))
+                    Uc_pad_hat_y2[:, :, 0] = (np.vstack((xy_plane2, np.conj(xy_plane2[(M//2-1):0:-1])))).transpose((1, 0))
+                    xy_plane2[:] = np.vstack((xy_plane_T[0].imag, -0.5*1j*(xy_plane_T[1:M//2]-np.conj(xy_plane_T[:M//2:-1])), xy_plane_T[M//2].imag))
+                    xy_plane_T[:] = np.vstack((xy_plane2, np.conj(xy_plane2[(M//2-1):0:-1])))
                     self.comm1.Send([xy_plane_T, self.mpitype], dest=self.P2-1, tag=77)
 
                 if self.comm1_rank == self.P2-1:

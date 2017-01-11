@@ -235,13 +235,17 @@ class R2C(object):
 
             else:
                 assert u.shape == self.real_shape_padded()
+                
+                # Scale smallest array with padsize
+                fu_ = self.work_arrays[(fu, 0, False)]
+                fu_[:] = fu*self.padsize**3
 
                 # First create padded complex array and then perform irfftn
                 fu_padded = self.work_arrays[(self.global_complex_shape(padsize=1.5), self.complex, 0)]
-                fu_padded[:self.N[0]//2, :self.N[1]//2, :self.Nf] = fu[:self.N[0]//2, :self.N[1]//2]
-                fu_padded[:self.N[0]//2, -self.N[1]//2:, :self.Nf] = fu[:self.N[0]//2, self.N[1]//2:]
-                fu_padded[-self.N[0]//2:, :self.N[1]//2, :self.Nf] = fu[self.N[0]//2:, :self.N[1]//2]
-                fu_padded[-self.N[0]//2:, -self.N[1]//2:, :self.Nf] = fu[self.N[0]//2:, -self.N[1]//2:]
+                fu_padded[:self.N[0]//2, :self.N[1]//2, :self.Nf] = fu_[:self.N[0]//2, :self.N[1]//2]
+                fu_padded[:self.N[0]//2, -self.N[1]//2:, :self.Nf] = fu_[:self.N[0]//2, self.N[1]//2:]
+                fu_padded[-self.N[0]//2:, :self.N[1]//2, :self.Nf] = fu_[self.N[0]//2:, :self.N[1]//2]
+                fu_padded[-self.N[0]//2:, -self.N[1]//2:, :self.Nf] = fu_[self.N[0]//2:, -self.N[1]//2:]
 
                 ## Current transform is only exactly reversible if periodic transforms are made symmetric
                 ## However, this seems to lead to more aliasing and as such the non-symmetrical padding is used
@@ -250,7 +254,7 @@ class R2C(object):
                 #fu_padded[self.N[0]//2] = fu_padded[-self.N[0]//2]
                 #fu_padded[:, self.N[1]//2] = fu_padded[:, -self.N[1]//2]
 
-                u[:] = irfftn(fu_padded*self.padsize**3, overwrite_input=True,
+                u[:] = irfftn(fu_padded, overwrite_input=True,
                               axes=(0, 1, 2), threads=self.threads,
                               planner_effort=self.planner_effort['irfftn'])
             return u
@@ -291,7 +295,9 @@ class R2C(object):
                     [Uc_hatT, self._counts_displs, self._subarraysB])
 
             # Do last two directions
-            u = irfft2(Uc_hatT, u, overwrite_input=True, axes=(1, 2), threads=self.threads, planner_effort=self.planner_effort['irfft2'])
+            u = irfft2(Uc_hatT, u, overwrite_input=True, axes=(1, 2),
+                       threads=self.threads,
+                       planner_effort=self.planner_effort['irfft2'])
 
         else:
             assert self.num_processes <= self.N[0]//2, "Number of processors cannot be larger than N[0]//2 for 3/2-rule"

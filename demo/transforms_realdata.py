@@ -7,6 +7,8 @@ from numpy import *
 from mpi4py import MPI
 #from mpiFFT4py.pencil import R2C
 from mpiFFT4py.slab import R2C
+from mpi4py_fft.mpifft import PFFT
+from time import time
 
 #assert MPI.COMM_WORLD.Get_size() >= 4
 
@@ -21,19 +23,34 @@ L = array([2*pi, 2*pi, 2*pi], dtype=float)
 # the first index in real physical space is shared amongst the processors,
 # whereas in wavenumber space the second index is shared.
 
-#FFT = R2C(N, L, MPI, "double", None, alignment='Y')
-FFT = R2C(N, L, MPI.COMM_WORLD, "double", communication='alltoall')
+#FFT = R2C(N, L, MPI.COMM_WORLD, "double", None, alignment='X', communication='Alltoallw')
+FFT = R2C(N, L, MPI.COMM_WORLD, "double", communication='Alltoallw')
+fft = PFFT(MPI.COMM_WORLD, N)
 
 U = random.random(FFT.real_shape()).astype(FFT.float) # real_shape = (N[0]//comm.Get_size(), N[1], N[2])
+U_copy = zeros_like(U)
 U_hat = zeros(FFT.complex_shape(), dtype=FFT.complex) # complex_shape = (N[0], N[1]//comm.Get_size(), N[2]//2+1)
 
 # Perform forward FFT. Real transform in third direction, complex in first two
 U_hat = FFT.fftn(U, U_hat)
 
 # Perform inverse FFT.
-U_copy = zeros_like(U)
 U_copy = FFT.ifftn(U_hat, U_copy)
+MPI.COMM_WORLD.barrier()
+t0 = time()
+U_hat = FFT.fftn(U, U_hat)
+U_copy = FFT.ifftn(U_hat, U_copy)
+print "mpiFFT4py ", time()-t0
+###########
+u = random.random(fft.forward.input_array.shape).astype(fft.forward.input_array.dtype)
+MPI.COMM_WORLD.barrier()
+t0 = time()
+u_hat = fft.forward(u)
+u_copy = fft.backward(u_hat)
+print "mpi4py-fft ", time()-t0
+#########
 
 tol = 1e-6 if FFT.float == float32 else 1e-10
 
 assert allclose(U, U_copy, tol, tol)
+assert allclose(u, u_copy, tol, tol)
