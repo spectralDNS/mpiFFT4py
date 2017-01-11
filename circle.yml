@@ -1,11 +1,11 @@
 machine:
   environment:
-    CONDA_ROOT: /home/ubuntu/miniconda
+    CONDA_ROOT: /home/ubuntu/miniconda2
     PATH: ${CONDA_ROOT}/bin:${PATH}
 
 dependencies:
   cache_directories:
-    - /home/ubuntu/miniconda
+    - /home/ubuntu/miniconda2
 
   override:
     - >

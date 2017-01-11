@@ -1,2 +1,2 @@
-cd $SRC_DIR/tests
+pushd tests
 mpirun -np 4 py.test
