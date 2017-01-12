@@ -28,8 +28,8 @@ or use precompiled binaries in the[*conda-forge*](https://anaconda.org/conda-for
     conda install -c conda-forge mpifft4py
 
 or
-
-    conda install -c spectralDNS -c conda-forge mpifft4py
+    conda config --add channels conda-forge
+    conda install -c spectralDNS mpifft4py
 
 There are binaries compiled for both OSX and linux, and several versions of Python. Note that the spectralDNS channel contains bleeding-edge versions of the Software, whereas conda-forge is more stable.
 
