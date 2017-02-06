@@ -304,8 +304,8 @@ class R2CY(object):
         X = np.ogrid[x1, x2, :self.N[2]]
 
         X[0] = (X[0]*self.L[0]/self.N[0]).astype(self.float)
-        X[1] = X[0]*self.L[1]/self.N[1]
-        X[2] = X[0]*self.L[2]/self.N[2]
+        X[1] = (X[1]*self.L[1]/self.N[1]).astype(self.float)
+        X[2] = (X[2]*self.L[2]/self.N[2]).astype(self.float)
         X = [np.broadcast_to(x, self.real_shape()) for x in X]
         return X
 
@@ -321,7 +321,7 @@ class R2CY(object):
         if scaled is True:
             Lp = 2*np.pi/self.L
             for i in range(3):
-                Ks[i] *= Lp[i]
+                Ks[i] = (Ks[i]*Lp[i]).astype(self.float)
         K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
         return K
 
