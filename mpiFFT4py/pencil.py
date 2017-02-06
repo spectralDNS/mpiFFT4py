@@ -285,6 +285,12 @@ class R2CY(object):
                 slice(0, self.N[1]),
                 slice(xzrank*self.N1[2]//2, xzrank*self.N1[2]//2 + self.N1f, 1))
 
+    def complex_local_wavenumbers(self):
+        s = self.complex_local_slice()
+        return (fftfreq(self.N[0], 1./self.N[0]).astype(int)[s[0]],
+                fftfreq(self.N[1], 1./self.N[1]).astype(int),
+                rfftfreq(self.N[2], 1./self.N[2]).astype(int)[s[2]])
+
     def get_P(self):
         return self.P1, self.P2
 
@@ -295,31 +301,28 @@ class R2CY(object):
         # Create the physical mesh
         x1 = slice(xzrank * self.N1[0], (xzrank+1) * self.N1[0], 1)
         x2 = slice(xyrank * self.N2[1], (xyrank+1) * self.N2[1], 1)
-        X = np.mgrid[x1, x2, :self.N[2]].astype(self.float)
-        X[0] *= self.L[0]/self.N[0]
-        X[1] *= self.L[1]/self.N[1]
-        X[2] *= self.L[2]/self.N[2]
+        X = np.ogrid[x1, x2, :self.N[2]]
+
+        X[0] = (X[0]*self.L[0]/self.N[0]).astype(self.float)
+        X[1] = X[0]*self.L[1]/self.N[1]
+        X[2] = X[0]*self.L[2]/self.N[2]
+        X = [np.broadcast_to(x, self.real_shape()) for x in X]
         return X
 
-    def get_local_wavenumbermesh(self):
-        xzrank = self.comm0.Get_rank() # Local rank in xz-plane
-        xyrank = self.comm1.Get_rank() # Local rank in xy-plane
+    def get_local_wavenumbermesh(self, scaled=False):
+        """Returns (scaled) local decomposed wavenumbermesh
 
-        # Set wavenumbers in grid
-        kx = fftfreq(self.N[0], 1./self.N[0]).astype(int)
-        ky = fftfreq(self.N[1], 1./self.N[1]).astype(int)
-        kz = rfftfreq(self.N[2], 1./self.N[2]).astype(int)
-        k2 = slice(xyrank*self.N2[0], (xyrank+1)*self.N2[0], 1)
-        k1 = slice(xzrank*self.N1[2]//2, xzrank*self.N1[2]//2 + self.N1f, 1)
-        K = np.array(np.meshgrid(kx[k2], ky, kz[k1], indexing='ij'), dtype=self.float)
-        return K
-
-    def get_scaled_local_wavenumbermesh(self):
-        K = self.get_local_wavenumbermesh()
-        # Scale with physical mesh size. This takes care of mapping the physical domain to a computational cube of size (2pi)**3
-        Lp = 2*np.pi/self.L
-        for i in range(3):
-            K[i] *= Lp[i]
+        If scaled is True, then the wavenumbermesh is scaled with physical mesh
+        size. This takes care of mapping the physical domain to a computational
+        cube of size (2pi)**3
+        """
+        kx, ky, kz = self.complex_local_wavenumbers()
+        Ks = np.meshgrid(kx, ky, kz, indexing='ij', sparse=True)
+        if scaled is True:
+            Lp = 2*np.pi/self.L
+            for i in range(3):
+                Ks[i] *= Lp[i]
+        K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
         return K
 
     def get_dealias_filter(self):
@@ -437,16 +440,16 @@ class R2CY(object):
                 self.comm1.Alltoall([Uc_hat_xp, self.mpitype], [Uc_hat_xp2, self.mpitype])
                 Uc_hat_xp = ifft(Uc_hat_xp2, Uc_hat_xp, axis=0, threads=self.threads,
                                  planner_effort=self.planner_effort['ifft'])
-                
+
                 Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 1, False)]
                 Uc_hat_x2[:] = Uc_hat_xp[:, :, :N1[2]//2]
-                
+
                 # Communicate and transform in xy-plane all but k=N/2
                 self.comm0.Alltoall([Uc_hat_x2, self.mpitype], [Uc_hat_x, self.mpitype])
                 #########################
-                
+
                 Uc_hat_z[:] = transform_Uc_zx(Uc_hat_z, Uc_hat_x, self.P1)
-                
+
                 xy_plane[:] = Uc_hat_xp[:, :, -1]
                 self.comm0.Scatter(xy_plane, xy_recv, root=self.P1-1)
                 Uc_hat_z[:, :, -1] = xy_recv
@@ -666,14 +669,14 @@ class R2CY(object):
                 #self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
                 #Uc_hat_x[:] = fft(Uc_hat_x, axis=0, threads=self.threads,
                                   #planner_effort=self.planner_effort['fft'])
-                
+
                 # Not in-place
                 Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 2, False)]
                 self.comm0.Alltoall([Uc_hat_x, self.mpitype], [Uc_hat_x2, self.mpitype])
                 Uc_hat_x = fft(Uc_hat_x2, Uc_hat_x, axis=0, threads=self.threads,
                                planner_effort=self.planner_effort['fft'])
                 ################
-                
+
                 Uc_hat_xr2[:, :, :N1[2]//2] = Uc_hat_x[:]
 
                 # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0

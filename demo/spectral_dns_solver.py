@@ -41,7 +41,7 @@ U_hat1 = empty((3,) + FFT.complex_shape(), dtype=complex)
 dU = empty((3,) + FFT.complex_shape(), dtype=complex)
 work = work_arrays()
 X = FFT.get_local_mesh()
-K = FFT.get_scaled_local_wavenumbermesh()
+K = FFT.get_local_wavenumbermesh(scaled=True)
 K2 = sum(K*K, 0, dtype=float)
 K_over_K2 = K.astype(float) / where(K2 == 0, 1, K2).astype(float)
 a = [1./6., 1./3., 1./3., 1./6.]

@@ -109,18 +109,16 @@ class R2C(object):
         X[1] *= self.L[1]/self.N[1]
         return X
 
-    def get_local_wavenumbermesh(self):
+    def get_local_wavenumbermesh(self, scaled=True):
         kx = fftfreq(self.N[0], 1./self.N[0])
         ky = fftfreq(self.N[1], 1./self.N[1])[:self.Nf]
         ky[-1] *= -1
-        K = np.array(np.meshgrid(kx, ky[self.rank*self.Np[1]//2:(self.rank*self.Np[1]//2+self.Npf)], indexing='ij'), dtype=self.float)
-        return K
-
-    def get_scaled_local_wavenumbermesh(self):
-        K = self.get_local_wavenumbermesh()
-        Lp = 2*np.pi/self.L
-        K[0] *= Lp[0]
-        K[1] *= Lp[1]
+        Ks = np.meshgrid(kx, ky[self.rank*self.Np[1]//2:(self.rank*self.Np[1]//2+self.Npf)], indexing='ij', sparse=True)
+        if scaled is True:
+            Lp = 2*np.pi/self.L
+            Ks[0] *= Lp[0]
+            Ks[1] *= Lp[1]
+        K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
         return K
 
     def get_dealias_filter(self):

@@ -151,29 +151,29 @@ class R2C(object):
 
     def get_local_mesh(self):
         """Returns the local decomposed physical mesh"""
-        X = np.mgrid[self.rank*self.Np[0]:(self.rank+1)*self.Np[0],
-                     :self.N[1], :self.N[2]].astype(self.float)
-        X[0] *= self.L[0]/self.N[0]
-        X[1] *= self.L[1]/self.N[1]
-        X[2] *= self.L[2]/self.N[2]
+        X = np.ogrid[self.rank*self.Np[0]:(self.rank+1)*self.Np[0],
+                     :self.N[1], :self.N[2]]
+        X[0] = (X[0]*self.L[0]/self.N[0]).astype(self.float)
+        X[1] = (X[1]*self.L[1]/self.N[1]).astype(self.float)
+        X[2] = (X[2]*self.L[2]/self.N[2]).astype(self.float)
+        X = [np.broadcast_to(x, self.real_shape()) for x in X]
         return X
 
-    def get_local_wavenumbermesh(self):
-        """Returns the local decomposed wavenumbermesh"""
-        kx, ky, kz = self.complex_local_wavenumbers()
-        K = np.array(np.meshgrid(kx, ky, kz, indexing='ij'), dtype=self.float)
-        return K
+    def get_local_wavenumbermesh(self, scaled=False):
+        """Returns (scaled) local decomposed wavenumbermesh
 
-    def get_scaled_local_wavenumbermesh(self):
-        """Returns scaled local decomposed wavenumbermesh
-
-        Wavenumbermesh is scaled with physical mesh size. This takes care of
-        mapping the physical domain to a computational cube of size (2pi)**3
+        If scaled is True, then the wavenumbermesh is scaled with physical mesh
+        size. This takes care of mapping the physical domain to a computational
+        cube of size (2pi)**3
         """
-        K = self.get_local_wavenumbermesh()
-        Lp = 2*np.pi/self.L
-        for i in range(3):
-            K[i] *= Lp[i]
+        kx, ky, kz = self.complex_local_wavenumbers()
+        Ks = np.meshgrid(kx, ky, kz, indexing='ij', sparse=True)
+        if scaled:
+            Lp = 2*np.pi/self.L
+            for i in range(3):
+                Ks[i] *= Lp[i]
+        K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
+        #K = np.array(np.meshgrid(kx, ky, kz, indexing='ij')).astype(self.float)
         return K
 
     def get_dealias_filter(self):
@@ -201,7 +201,7 @@ class R2C(object):
     #@profile
     def ifftn(self, fu, u, dealias=None):
         """ifft in three directions using mpi.
-        
+
         Need to do ifft in reversed order of fft
 
         dealias = "3/2-rule"
@@ -235,7 +235,7 @@ class R2C(object):
 
             else:
                 assert u.shape == self.real_shape_padded()
-                
+
                 # Scale smallest array with padsize
                 fu_ = self.work_arrays[(fu, 0, False)]
                 fu_[:] = fu*self.padsize**3
