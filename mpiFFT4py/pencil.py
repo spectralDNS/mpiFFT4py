@@ -392,7 +392,7 @@ class R2CY(object):
                 Uc_hat_y = ifft(fu, Uc_hat_y, axis=1, threads=self.threads,
                                 planner_effort=self.planner_effort['ifft'])
 
-                # Transform to x all but k=N/2 (the neglected Nyquist mode)
+                # Transform to x all but k=N//2 (the neglected Nyquist mode)
                 Uc_hat_x[:] = transform_Uc_xy(Uc_hat_x, Uc_hat_y, self.P2)
 
                 # Communicate in xz-plane and do fft in x-direction
@@ -431,7 +431,7 @@ class R2CY(object):
 
                 #Uc_hat_x[:] = Uc_hat_xp[:, :, :self.N1[2]//2]
 
-                ## Communicate and transform in xy-plane all but k=N/2
+                ## Communicate and transform in xy-plane all but k=N//2
                 #self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
 
                 ####### Not in-place
@@ -444,7 +444,7 @@ class R2CY(object):
                 Uc_hat_x2 = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 1, False)]
                 Uc_hat_x2[:] = Uc_hat_xp[:, :, :N1[2]//2]
 
-                # Communicate and transform in xy-plane all but k=N/2
+                # Communicate and transform in xy-plane all but k=N//2
                 self.comm0.Alltoall([Uc_hat_x2, self.mpitype], [Uc_hat_x, self.mpitype])
                 #########################
 
@@ -503,7 +503,7 @@ class R2CY(object):
                 Uc_pad_hat_y[:] = ifft(Uc_pad_hat_y, axis=1, threads=self.threads,
                                        planner_effort=self.planner_effort['ifft'])
 
-                # Transform to x all but k=N/2 (the neglected Nyquist mode)
+                # Transform to x all but k=N//2 (the neglected Nyquist mode)
                 Uc_pad_hat_x = transform_Uc_xy(Uc_pad_hat_x, Uc_pad_hat_y, self.P2)
 
                 # Communicate in xz-plane
@@ -556,7 +556,7 @@ class R2CY(object):
 
                 Uc_pad_hat_xy[:] = Uc_pad_hat_xy3[:, :, :N1[2]//2]
 
-                # Communicate and transform in xy-plane all but k=N/2
+                # Communicate and transform in xy-plane all but k=N//2
                 self.comm0.Alltoall(MPI.IN_PLACE, [Uc_pad_hat_xy, self.mpitype])
 
                 Uc_pad_hat_z[:] = transform_Uc_zx(Uc_pad_hat_z, Uc_pad_hat_xy, self.P1)
@@ -629,7 +629,7 @@ class R2CY(object):
                 Uc_hat_z = rfft(u, Uc_hat_z, axis=2, threads=self.threads,
                                 planner_effort=self.planner_effort['rfft'])
 
-                # Transform to x direction neglecting k=N/2 (Nyquist)
+                # Transform to x direction neglecting k=N//2 (Nyquist)
                 Uc_hat_x = transform_Uc_xz(Uc_hat_x, Uc_hat_z, self.P1)
 
                 # Communicate and do fft in x-direction
@@ -661,7 +661,7 @@ class R2CY(object):
                 # Move real part of Nyquist to k=0
                 Uc_hat_z[:, :, 0] += 1j*Uc_hat_z[:, :, -1]
 
-                # Transform to x direction neglecting k=N/2 (Nyquist)
+                # Transform to x direction neglecting k=N//2 (Nyquist)
                 Uc_hat_x = transform_Uc_xz(Uc_hat_x, Uc_hat_z, self.P1)
 
                 # In-place
@@ -679,7 +679,7 @@ class R2CY(object):
 
                 Uc_hat_xr2[:, :, :N1[2]//2] = Uc_hat_x[:]
 
-                # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
+                # Now both k=0 and k=N//2 are contained in 0 of comm0_rank = 0
                 if self.comm0_rank == 0:
                     M = N[0]
                     xy_plane[:] = Uc_hat_x[:, :, 0]
@@ -752,7 +752,7 @@ class R2CY(object):
 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
 
-                # Transform to x direction neglecting k=N/2 (Nyquist)
+                # Transform to x direction neglecting k=N//2 (Nyquist)
                 Uc_pad_hat_xy = transform_Uc_xz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P1)
 
                 # Communicate and do fft in x-direction
@@ -789,7 +789,7 @@ class R2CY(object):
                 # Move real part of Nyquist to k=0
                 Uc_pad_hat_z[:, :, 0] += 1j*Uc_pad_hat_z[:, :, -1]
 
-                # Transform to x direction neglecting k=N/2 (Nyquist)
+                # Transform to x direction neglecting k=N//2 (Nyquist)
                 Uc_pad_hat_xy[:] = transform_Uc_xz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P1)
 
                 # Communicate and do fft in x-direction
@@ -801,14 +801,14 @@ class R2CY(object):
 
                 Uc_pad_hat_xr2[:, :, :N1[2]//2] = Uc_pad_hat_x[:]
 
-                # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
+                # Now both k=0 and k=N//2 are contained in 0 of comm0_rank = 0
                 if self.comm0_rank == 0:
                     N = self.N[0]
                     xy_pad_plane[:] = Uc_pad_hat_x[:, :, 0]
-                    xy_pad_plane2[:] = np.vstack((xy_pad_plane[0].real, 0.5*(xy_pad_plane[1:N/2]+np.conj(xy_pad_plane[:N/2:-1])), xy_pad_plane[N/2].real))
-                    Uc_pad_hat_xr2[:, :, 0] = np.vstack((xy_pad_plane2, np.conj(xy_pad_plane2[(N/2-1):0:-1])))
-                    xy_pad_plane2[:] = np.vstack((xy_pad_plane[0].imag, -0.5*1j*(xy_pad_plane[1:N/2]-np.conj(xy_pad_plane[:N/2:-1])), xy_pad_plane[N/2].imag))
-                    xy_pad_plane[:] = np.vstack((xy_pad_plane2, np.conj(xy_pad_plane2[(N/2-1):0:-1])))
+                    xy_pad_plane2[:] = np.vstack((xy_pad_plane[0].real, 0.5*(xy_pad_plane[1:N//2]+np.conj(xy_pad_plane[:N//2:-1])), xy_pad_plane[N//2].real))
+                    Uc_pad_hat_xr2[:, :, 0] = np.vstack((xy_pad_plane2, np.conj(xy_pad_plane2[(N//2-1):0:-1])))
+                    xy_pad_plane2[:] = np.vstack((xy_pad_plane[0].imag, -0.5*1j*(xy_pad_plane[1:N//2]-np.conj(xy_pad_plane[:N//2:-1])), xy_pad_plane[N//2].imag))
+                    xy_pad_plane[:] = np.vstack((xy_pad_plane2, np.conj(xy_pad_plane2[(N//2-1):0:-1])))
                     self.comm0.Send([xy_pad_plane, self.mpitype], dest=self.P1-1, tag=77)
 
                 if self.comm0_rank == self.P1-1:
@@ -1005,7 +1005,7 @@ class R2CX(R2CY):
                 # Communicate in xz-plane and do fft in y-direction
                 self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
 
-                # Transform to y all but k=N/2 (the neglected Nyquist mode)
+                # Transform to y all but k=N//2 (the neglected Nyquist mode)
                 Uc_hat_y = transform_Uc_yx(Uc_hat_y, Uc_hat_x, self.P1)
                 Uc_hat_y[:] = ifft(Uc_hat_y, axis=1, threads=self.threads,
                                    planner_effort=self.planner_effort['ifft'])
@@ -1034,7 +1034,7 @@ class R2CX(R2CY):
                 # Communicate in xz-plane and do fft in y-direction
                 self.comm0.Alltoall(MPI.IN_PLACE, [Uc_hat_x, self.mpitype])
 
-                # Transform to y all but k=N/2 (the neglected Nyquist mode)
+                # Transform to y all but k=N//2 (the neglected Nyquist mode)
                 Uc_hat_y2 = transform_Uc_yx(Uc_hat_y2, Uc_hat_x, self.P1)
                 Uc_hat_y2[:] = ifft(Uc_hat_y2, axis=1, threads=self.threads,
                                     planner_effort=self.planner_effort['ifft'])
@@ -1217,7 +1217,7 @@ class R2CX(R2CY):
                 Uc_hat_z = rfft(u, Uc_hat_z, axis=2, threads=self.threads,
                                 planner_effort=self.planner_effort['rfft'])
 
-                # Transform to y direction neglecting k=N/2 (Nyquist)
+                # Transform to y direction neglecting k=N//2 (Nyquist)
                 Uc_hat_y = transform_Uc_yz(Uc_hat_y, Uc_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
@@ -1251,7 +1251,7 @@ class R2CX(R2CY):
                 # Move real part of Nyquist to k=0
                 Uc_hat_z[:, :, 0] += 1j*Uc_hat_z[:, :, -1]
 
-                # Transform to y direction neglecting k=N/2 (Nyquist)
+                # Transform to y direction neglecting k=N//2 (Nyquist)
                 Uc_hat_y = transform_Uc_yz(Uc_hat_y, Uc_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
@@ -1260,7 +1260,7 @@ class R2CX(R2CY):
                                 planner_effort=self.planner_effort['fft'])
                 Uc_hat_y2[:, :, :self.N2[2]//2] = Uc_hat_y3[:]
 
-                # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
+                # Now both k=0 and k=N//2 are contained in 0 of comm0_rank = 0
                 if self.comm1_rank == 0:
                     M = self.N[1]
                     xy_plane[:] = Uc_hat_y3[:, :, 0]
@@ -1334,7 +1334,7 @@ class R2CX(R2CY):
 
                 Uc_pad_hat_z = self.copy_from_padded_z(Uc_pad_hat_z2, Uc_pad_hat_z)
 
-                # Transform to y direction neglecting k=N/2 (Nyquist)
+                # Transform to y direction neglecting k=N//2 (Nyquist)
                 Uc_pad_hat_xy = transform_Uc_yz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
@@ -1376,7 +1376,7 @@ class R2CX(R2CY):
                 # Move real part of Nyquist to k=0
                 Uc_pad_hat_z[:, :, 0] += 1j*Uc_pad_hat_z[:, :, -1]
 
-                # Transform to y direction neglecting k=N/2 (Nyquist)
+                # Transform to y direction neglecting k=N//2 (Nyquist)
                 Uc_pad_hat_xy = transform_Uc_yz(Uc_pad_hat_xy, Uc_pad_hat_z, self.P2)
 
                 # Communicate and do fft in y-direction. Transpose required to put distributed axis first
@@ -1388,7 +1388,7 @@ class R2CX(R2CY):
 
                 Uc_pad_hat_y2[:, :, :self.N2[2]//2] = Uc_pad_hat_y[:]
 
-                # Now both k=0 and k=N/2 are contained in 0 of comm0_rank = 0
+                # Now both k=0 and k=N//2 are contained in 0 of comm0_rank = 0
                 if self.comm1_rank == 0:
                     M = self.N[1]
                     xy_plane[:] = Uc_pad_hat_y[:, :, 0]

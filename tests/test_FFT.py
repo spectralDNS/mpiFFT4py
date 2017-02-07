@@ -275,7 +275,7 @@ def test_FFT_C2C(FFT_C2C):
 
 #import time
 #t0 = time.time()
-#test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="Y", communication='Alltoall'))
+#test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI.COMM_WORLD, "double", alignment="Y", communication='Alltoall'))
 #t1 = time.time()
 #test_FFT_padded(Pencil_R2C(array([N, N, N], dtype=int), L, MPI, "double", alignment="X", communication='Alltoall'))
 #t2 = time.time()
