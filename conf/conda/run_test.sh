@@ -3,7 +3,7 @@
 pushd tests
 
 if [ "$(uname)" == "Darwin" ]; then
-    mpirun -np 1 py.test
+    py.test -v
 fi
 
 if [ "$(uname)" == "Linux" ]; then

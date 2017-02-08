@@ -19,7 +19,8 @@ requirements:
     - numpy
     - scipy
     - mpi4py
-    - mpich
+    - mpich  #[unix]
+    - openmpi ==1.6.3 #[osx]
     - cython
     - pyfftw
 
