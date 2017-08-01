@@ -352,13 +352,15 @@ class R2CY(object):
         return fu
 
     def copy_from_padded_x(self, fp, fu):
-        fu[:self.N[0]//2] = fp[:self.N[0]//2]
-        fu[self.N[0]//2:] = fp[-self.N[0]//2:]
+        fu.fill(0)
+        fu[:self.N[0]//2+1] = fp[:self.N[0]//2+1]
+        fu[self.N[0]//2:] += fp[-self.N[0]//2:]
         return fu
 
     def copy_from_padded_y(self, fp, fu):
-        fu[:, :self.N[1]//2] = fp[:, :self.N[1]//2]
-        fu[:, self.N[1]//2:] = fp[:, -self.N[1]//2:]
+        fu.fill(0)
+        fu[:, :self.N[1]//2+1] = fp[:, :self.N[1]//2+1]
+        fu[:, self.N[1]//2:] += fp[:, -self.N[1]//2:]
         return fu
 
     def global_complex_shape(self, padsize=1.0):
@@ -379,8 +381,13 @@ class R2CY(object):
         N, N1, N2, Nf, N1f = self.N, self.N1, self.N2, self.Nf, self.N1f
 
         if not dealias == '3/2-rule':
+
+            fu_ = fu
             if dealias == '2/3-rule':
-                fu *= self.dealias
+                fu_ = self.work_arrays[(fu, 0, False)]
+                fu_[:] = fu
+                fu_ = dealias_filter(fu_, self.dealias)
+                #fu_ *= self.dealias
 
             Uc_hat_y = self.work_arrays[((N2[0], N[1], N1f), self.complex, 0, False)]
             Uc_hat_z = self.work_arrays[((N1[0], N2[1], Nf), self.complex, 0, False)]
@@ -389,7 +396,7 @@ class R2CY(object):
                 Uc_hat_x = self.work_arrays[((N[0], N2[1], N1[2]//2), self.complex, 0, False)]
 
                 # Do first owned direction
-                Uc_hat_y = ifft(fu, Uc_hat_y, axis=1, threads=self.threads,
+                Uc_hat_y = ifft(fu_, Uc_hat_y, axis=1, threads=self.threads,
                                 planner_effort=self.planner_effort['ifft'])
 
                 # Transform to x all but k=N//2 (the neglected Nyquist mode)
@@ -417,7 +424,7 @@ class R2CY(object):
                 xy_recv   = self.work_arrays[((N1[0], N2[1]), self.complex, 0, False)]
 
                 # Do first owned direction
-                Uc_hat_y = ifft(fu, Uc_hat_y, axis=1, threads=self.threads,
+                Uc_hat_y = ifft(fu_, Uc_hat_y, axis=1, threads=self.threads,
                                 planner_effort=self.planner_effort['ifft'])
 
                 # Transform to x
@@ -466,7 +473,7 @@ class R2CY(object):
                 Uc_hat_x  = self.work_arrays[((N[0], N2[1], N1f), self.complex, 0, False)]
 
                 # Do first owned direction
-                Uc_hat_y = ifft(fu, Uc_hat_y, axis=1, threads=self.threads,
+                Uc_hat_y = ifft(fu_, Uc_hat_y, axis=1, threads=self.threads,
                                 planner_effort=self.planner_effort['ifft'])
 
                 self.comm1.Alltoallw(
@@ -987,8 +994,13 @@ class R2CX(R2CY):
             self.dealias = self.get_dealias_filter()
 
         if not dealias == '3/2-rule':
+
+            fu_ = fu
             if dealias == '2/3-rule':
-                fu *= self.dealias
+                fu_ = self.work_arrays[(fu, 0, False)]
+                fu_[:] = fu
+                fu_ = dealias_filter(fu_, self.dealias)
+                #fu_ *= self.dealias
 
             # Intermediate work arrays required for transform
             Uc_hat_z  = self.work_arrays[((self.N1[0], self.N2[1], self.Nf), self.complex, 0)]
@@ -999,7 +1011,7 @@ class R2CX(R2CY):
                 Uc_hat_y = Uc_hat_y_T.transpose((1, 0, 2))
 
                 # Do first owned direction
-                Uc_hat_x = ifft(fu, Uc_hat_x, axis=0, threads=self.threads,
+                Uc_hat_x = ifft(fu_, Uc_hat_x, axis=0, threads=self.threads,
                                 planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
@@ -1028,7 +1040,7 @@ class R2CX(R2CY):
                 xy_recv   = self.work_arrays[((self.N2[1], self.N1[0]), self.complex, 0)]
 
                 # Do first owned direction
-                Uc_hat_x = ifft(fu, Uc_hat_x, axis=0, threads=self.threads,
+                Uc_hat_x = ifft(fu_, Uc_hat_x, axis=0, threads=self.threads,
                                 planner_effort=self.planner_effort['ifft'])
 
                 # Communicate in xz-plane and do fft in y-direction
@@ -1060,7 +1072,7 @@ class R2CX(R2CY):
                 Uc_hat_y = self.work_arrays[((self.N1[0], self.N[1], self.N2f), self.complex, 0)]
 
                 # Do first owned direction
-                Uc_hat_x = ifft(fu, Uc_hat_x, axis=0, threads=self.threads,
+                Uc_hat_x = ifft(fu_, Uc_hat_x, axis=0, threads=self.threads,
                                 planner_effort=self.planner_effort['ifft'])
 
                 self.comm0.Alltoallw(

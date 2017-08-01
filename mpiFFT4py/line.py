@@ -237,7 +237,9 @@ class R2C(object):
 
             U_sendr = fft(U_sendr/self.padsize, U_sendr, axis=0, threads=self.threads, planner_effort=self.planner_effort['fft'])
 
-            fu[:, :self.Np[1]//2] = U_sendr[self.ks]
+            fu.fill(0)
+            fu[:self.N[0]//2+1, :self.Np[1]//2] = U_sendr[:self.N[0]//2+1]
+            fu[self.N[0]//2:, :self.Np[1]//2] += U_sendr[-self.N[0]//2:]
 
             # Handle Nyquist frequency
             if self.rank == 0:
@@ -256,12 +258,15 @@ class R2C(object):
         if dealias == '2/3-rule' and self.dealias.shape == (0,):
             self.dealias = self.get_dealias_filter()
 
+        fu_ = fu
         if dealias == '2/3-rule':
-            fu *= self.dealias
+            fu_ = self.work_arrays[(fu, 0, False)]
+            fu_[:] = fu
+            fu_ *= self.dealias
 
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
-                u = irfft2(fu, u, axes=(0,1), threads=self.threads, planner_effort=self.planner_effort['irfft2'])
+                u = irfft2(fu_, u, axes=(0,1), threads=self.threads, planner_effort=self.planner_effort['irfft2'])
 
             else:
                 fu_padded = self.work_arrays[(self.global_complex_shape_padded(), self.complex, 0)]
@@ -280,7 +285,7 @@ class R2C(object):
             fft_x = self.work_arrays[((self.N[0],), self.complex, 1)]
             plane_recv = self.work_arrays[((self.Np[0],), self.complex, 2)]
 
-            Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+            Uc_hat = ifft(fu_, Uc_hat, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
             U_sendr[:] = Uc_hat[:, :self.Np[1]//2]
 
             self.comm.Alltoall(MPI.IN_PLACE, [U_send, self.mpitype])

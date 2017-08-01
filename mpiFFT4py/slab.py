@@ -225,13 +225,16 @@ class R2C(object):
         if dealias == '2/3-rule' and self.dealias.shape == (0,):
             self.dealias = self.get_dealias_filter()
 
+        fu_ = fu
         if dealias == '2/3-rule':
-            fu = dealias_filter(fu, self.dealias)
-            #fu *= self.dealias
+            fu_ = self.work_arrays[(fu, 0, False)]
+            fu_[:] = fu
+            fu_ = dealias_filter(fu_, self.dealias)
+            #fu_ *= self.dealias
 
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
-                u = irfftn(fu, u, axes=(0, 1, 2), threads=self.threads, planner_effort=self.planner_effort['irfftn'])
+                u = irfftn(fu_, u, axes=(0, 1, 2), threads=self.threads, planner_effort=self.planner_effort['irfftn'])
 
             else:
                 assert u.shape == self.real_shape_padded()
@@ -247,13 +250,6 @@ class R2C(object):
                 fu_padded[-self.N[0]//2:, :self.N[1]//2, :self.Nf] = fu_[self.N[0]//2:, :self.N[1]//2]
                 fu_padded[-self.N[0]//2:, -self.N[1]//2:, :self.Nf] = fu_[self.N[0]//2:, -self.N[1]//2:]
 
-                ## Current transform is only exactly reversible if periodic transforms are made symmetric
-                ## However, this seems to lead to more aliasing and as such the non-symmetrical padding is used
-                #fu_padded[:, -self.N[1]//2] *= 0.5
-                #fu_padded[-self.N[0]//2] *= 0.5
-                #fu_padded[self.N[0]//2] = fu_padded[-self.N[0]//2]
-                #fu_padded[:, self.N[1]//2] = fu_padded[:, -self.N[1]//2]
-
                 u[:] = irfftn(fu_padded, overwrite_input=True,
                               axes=(0, 1, 2), threads=self.threads,
                               planner_effort=self.planner_effort['irfftn'])
@@ -264,7 +260,7 @@ class R2C(object):
             Uc_hat = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
 
             # Do first owned direction
-            Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
+            Uc_hat = ifft(fu_, Uc_hat, axis=0, threads=self.threads, planner_effort=self.planner_effort['ifft'])
 
             if self.communication == 'Alltoall':
                 Uc_mpi = self.work_arrays[((self.num_processes, self.Np[0], self.Np[1], self.Nf), self.complex, 0, False)]
@@ -370,14 +366,12 @@ class R2C(object):
                                   planner_effort=self.planner_effort['rfftn'])
 
                 # Copy with truncation
-                fu[:self.N[0]//2, :self.N[1]//2] = fu_padded[:self.N[0]//2, :self.N[1]//2, :self.Nf]
-                fu[:self.N[0]//2, self.N[1]//2:] = fu_padded[:self.N[0]//2, -self.N[1]//2:, :self.Nf]
-                fu[self.N[0]//2:, :self.N[1]//2] = fu_padded[-self.N[0]//2:, :self.N[1]//2, :self.Nf]
-                fu[self.N[0]//2:, self.N[1]//2:] = fu_padded[-self.N[0]//2:, -self.N[1]//2:, :self.Nf]
+                fu.fill(0)
+                fu[:self.N[0]//2+1, :self.N[1]//2+1] = fu_padded[:self.N[0]//2+1, :self.N[1]//2+1, :self.Nf]
+                fu[:self.N[0]//2+1, self.N[1]//2:] += fu_padded[:self.N[0]//2+1, -self.N[1]//2:, :self.Nf]
+                fu[self.N[0]//2:, :self.N[1]//2+1] += fu_padded[-self.N[0]//2:, :self.N[1]//2+1, :self.Nf]
+                fu[self.N[0]//2:, self.N[1]//2:] += fu_padded[-self.N[0]//2:, -self.N[1]//2:, :self.Nf]
                 fu /= self.padsize**3
-                ## Modify for symmetric padding
-                #fu[:, -self.N[1]//2] *= 2
-                #fu[self.N[0]//2] *= 2
 
             return fu
 
@@ -443,7 +437,7 @@ class R2C(object):
             # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
             Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1, False)]
-            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0, False)]
+            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
             Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
 
             # Do ffts in the padded y and z directions
@@ -471,8 +465,9 @@ class R2C(object):
                            planner_effort=self.planner_effort['fft'])
 
             # Truncate to original complex shape
-            fu[:self.N[0]//2] = Upad_hat[:self.N[0]//2]
-            fu[self.N[0]//2:] = Upad_hat[-self.N[0]//2:]
+            fu.fill(0)
+            fu[:self.N[0]//2+1] = Upad_hat[:self.N[0]//2+1]
+            fu[self.N[0]//2:] += Upad_hat[-self.N[0]//2:]
             fu /= self.padsize**3
 
         return fu
@@ -521,8 +516,9 @@ class R2C(object):
     @staticmethod
     def copy_from_padded(fp, fu, N, axis=0):
         if axis == 1:
-            fu[:, :N[1]//2] = fp[:, :N[1]//2, :(N[2]//2+1)]
-            fu[:, N[1]//2:] = fp[:, -N[1]//2:, :(N[2]//2+1)]
+            fu.fill(0)
+            fu[:, :N[1]//2+1] = fp[:, :N[1]//2+1, :(N[2]//2+1)]
+            fu[:, N[1]//2:] += fp[:, -N[1]//2:, :(N[2]//2+1)]
         elif axis == 2:
             fu[:] = fp[:, :, :(N[2]//2+1)]
         return fu
@@ -603,10 +599,13 @@ class C2C(R2C):
 
         if self.num_processes == 1:
             if not dealias == '3/2-rule':
+                fu_ = fu
                 if dealias == '2/3-rule':
-                    fu *= self.dealias
+                    fu_ = self.work_arrays[(fu, 0, False)]
+                    fu_[:] = fu
+                    fu_ *= self.dealias
 
-                u = ifftn(fu, u, axes=(0, 1, 2), threads=self.threads,
+                u = ifftn(fu_, u, axes=(0, 1, 2), threads=self.threads,
                           planner_effort=self.planner_effort['ifftn'])
 
             else:
@@ -625,8 +624,11 @@ class C2C(R2C):
             return u
 
         if not dealias == '3/2-rule':
+            fu_ = fu
             if dealias == '2/3-rule':
-                fu *= self.dealias
+                fu_ = self.work_arrays[(fu, 0, False)]
+                fu_[:] = fu
+                fu_ *= self.dealias
 
             # Intermediate work arrays required for transform
             Uc_hat  = self.work_arrays[(self.complex_shape(), self.complex, 0, False)]
@@ -634,7 +636,7 @@ class C2C(R2C):
             Uc_hatT = self.work_arrays[(self.complex_shape_T(), self.complex, 0, False)]
 
             # Do first owned direction
-            Uc_hat = ifft(fu, Uc_hat, axis=0, threads=self.threads,
+            Uc_hat = ifft(fu_, Uc_hat, axis=0, threads=self.threads,
                           planner_effort=self.planner_effort['ifft'])
 
             if self.communication == 'Alltoall':
@@ -761,7 +763,7 @@ class C2C(R2C):
             # Intermediate work arrays required for transform
             Upad_hat  = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 0, False)]
             Upad_hat0 = self.work_arrays[(self.complex_shape_padded_0(), self.complex, 1, False)]
-            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0, False)]
+            Upad_hat1 = self.work_arrays[(self.complex_shape_padded_1(), self.complex, 0)]
             Upad_hat3 = self.work_arrays[(self.complex_shape_padded_3(), self.complex, 0, False)]
             U_mpi     = self.work_arrays[(self.complex_shape_padded_0_I(), self.complex, 0, False)]
 
@@ -802,10 +804,11 @@ class C2C(R2C):
     @staticmethod
     def copy_from_padded(fp, fu, N, axis=0):
         if axis == 1:
-            fu[:, :N[1]//2, :N[2]//2] = fp[:, :N[1]//2, :N[2]//2]
-            fu[:, :N[1]//2, N[2]//2:] = fp[:, :N[1]//2, -N[2]//2:]
-            fu[:, N[1]//2:, :N[2]//2] = fp[:, -N[1]//2:, :N[2]//2]
-            fu[:, N[1]//2:, N[2]//2:] = fp[:, -N[1]//2:, -N[2]//2:]
+            fu.fill(0)
+            fu[:, :N[1]//2+1, :N[2]//2+1] = fp[:, :N[1]//2+1, :N[2]//2+1]
+            fu[:, :N[1]//2+1, N[2]//2:] += fp[:, :N[1]//2+1, -N[2]//2:]
+            fu[:, N[1]//2:, :N[2]//2+1] += fp[:, -N[1]//2:, :N[2]//2+1]
+            fu[:, N[1]//2:, N[2]//2:] += fp[:, -N[1]//2:, -N[2]//2:]
 
         return fu
 

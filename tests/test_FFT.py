@@ -168,8 +168,8 @@ def test_FFT_padded(FFT):
         C = FFT_SELF.fftn(A, C)
 
         # Eliminate Nyquist, otherwise test will fail
-        C[-N[0]//2] = 0
-        C[:, -N[1]//2] = 0
+        #C[-N[0]//2] = 0
+        #C[:, -N[1]//2] = 0
         if FFT.communication == 'AlltoallN':
             C[:, :, -1] = 0  # Remove Nyquist frequency
 

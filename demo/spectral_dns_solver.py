@@ -42,8 +42,10 @@ dU = empty((3,) + FFT.complex_shape(), dtype=complex)
 work = work_arrays()
 X = FFT.get_local_mesh()
 K = FFT.get_local_wavenumbermesh(scaled=True)
-K2 = sum(K*K, 0, dtype=float)
-K_over_K2 = K.astype(float) / where(K2 == 0, 1, K2).astype(float)
+K2 = K[0]*K[0] + K[1]*K[1] + K[2]*K[2]
+K_over_K2 = empty((3,) + FFT.complex_shape())
+for k in range(3):
+    K_over_K2[k] = K[k].astype(float) / where(K2 == 0, 1, K2).astype(float)
 a = [1./6., 1./3., 1./3., 1./6.]
 b = [0.5, 0.5, 1.]
 dealias = '3/2-rule'  # ('2/3-rule', None)

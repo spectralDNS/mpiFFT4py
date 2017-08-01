@@ -38,11 +38,11 @@ Empty, Zeros = np.empty, np.zeros
 try:
     import pyfftw
     def empty(N, dtype=np.float, bytes=16):
-        return pyfftw.byte_align(Empty(N, dtype=dtype), n=bytes)
+        return pyfftw.empty_aligned(N, dtype=dtype, n=bytes)
 
     def zeros(N, dtype=np.float, bytes=16):
-        return pyfftw.byte_align(Zeros(N, dtype=dtype), n=bytes)
-        
+        return pyfftw.zeros_aligned(N, dtype=dtype, n=bytes)
+
 except ImportError:
     def empty(N, dtype=np.float, bytes=None):
         return Empty(N, dtype=dtype)
@@ -60,17 +60,17 @@ class work_array_dict(dict):
 
 class work_arrays(collections.MutableMapping):
     """A dictionary to hold numpy work arrays.
-    
-    The dictionary allows two types of keys for the same item.    
-    
+
+    The dictionary allows two types of keys for the same item.
+
     keys:
-        - (shape, dtype, index (, fillzero)), where shape is tuple, dtype is np.dtype and 
+        - (shape, dtype, index (, fillzero)), where shape is tuple, dtype is np.dtype and
                                               index an integer
         - (ndarray, index (, fillzero)),      where ndarray is a numpy array and index is
                                               an integer
                                               fillzero is an optional bool that determines
                                               whether the array is initialised to zero
-                                              
+
     Usage:
         To create two real work arrays of shape (3,3), do:
         - work = workarrays()
@@ -80,13 +80,13 @@ class work_arrays(collections.MutableMapping):
     Returns:
         Numpy array of given shape. The array is by default initialised to zero, but this
         can be overridden using the fillzero argument.
-        
+
     """
 
     def __init__(self):
         self.store = work_array_dict()
         self.fillzero = True
-    
+
     def __getitem__(self, key):
         val = self.store[self.__keytransform__(key)]
         if self.fillzero is True: val.fill(0)
@@ -103,35 +103,28 @@ class work_arrays(collections.MutableMapping):
 
     def __len__(self):
         return len(self.store)
-    
+
     def values(self):
         raise TypeError('Work arrays not iterable')
 
     def __keytransform__(self, key):
         if isinstance(key[0], np.ndarray):
-            if len(key) == 2:
-                shape = key[0].shape
-                dtype = key[0].dtype
-                i = key[1]
-                zero = True
-                
-            elif len(key) == 3:
-                shape = key[0].shape
-                dtype = key[0].dtype
-                i = key[1]
-                zero = key[2]
-            
+            shape = key[0].shape
+            dtype = key[0].dtype
+            i = key[1]
+            zero = True if len(key) == 2 else key[2]
+
         elif isinstance(key[0], tuple):
             if len(key) == 3:
                 shape, dtype, i = key
                 zero = True
-                
+
             elif len(key) == 4:
                 shape, dtype, i, zero = key
-            
+
         else:
             raise TypeError("Wrong type of key for work array")
-        
+
         assert isinstance(zero, bool)
         assert isinstance(i, int)
         self.fillzero = zero

@@ -25,7 +25,7 @@ L = array([2*pi, 2*pi, 2*pi], dtype=float)
 
 #FFT = R2C(N, L, MPI.COMM_WORLD, "double", None, alignment='X', communication='Alltoallw')
 FFT = R2C(N, L, MPI.COMM_WORLD, "double", communication='Alltoallw')
-fft = PFFT(MPI.COMM_WORLD, N)
+fft = PFFT(MPI.COMM_WORLD, N, collapse=False, slab=2)
 
 U = random.random(FFT.real_shape()).astype(FFT.float) # real_shape = (N[0]//comm.Get_size(), N[1], N[2])
 U_copy = zeros_like(U)
@@ -40,14 +40,14 @@ MPI.COMM_WORLD.barrier()
 t0 = time()
 U_hat = FFT.fftn(U, U_hat)
 U_copy = FFT.ifftn(U_hat, U_copy)
-print "mpiFFT4py ", time()-t0
+print("mpiFFT4py ", time()-t0)
 ###########
 u = random.random(fft.forward.input_array.shape).astype(fft.forward.input_array.dtype)
 MPI.COMM_WORLD.barrier()
 t0 = time()
 u_hat = fft.forward(u)
 u_copy = fft.backward(u_hat)
-print "mpi4py-fft ", time()-t0
+print("mpi4py-fft ", time()-t0)
 #########
 
 tol = 1e-6 if FFT.float == float32 else 1e-10
