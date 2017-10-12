@@ -159,21 +159,31 @@ class R2C(object):
         X = [np.broadcast_to(x, self.real_shape()) for x in X]
         return X
 
-    def get_local_wavenumbermesh(self, scaled=False):
+    def get_local_wavenumbermesh(self, scaled=False, broadcast=False, eliminate_highest_freq=False):
         """Returns (scaled) local decomposed wavenumbermesh
 
         If scaled is True, then the wavenumbermesh is scaled with physical mesh
         size. This takes care of mapping the physical domain to a computational
-        cube of size (2pi)**3
+        cube of size (2pi)**3.
+
+        If eliminate_highest_freq is True, then the Nyquist frequency is set to zero.
         """
         kx, ky, kz = self.complex_local_wavenumbers()
+        if eliminate_highest_freq:
+            ky = fftfreq(self.N[1], 1./self.N[1])
+            for i, k in enumerate((kx, ky, kz)):
+                if self.N[i] % 2 == 0:
+                    k[self.N[i]//2] = 0
+            ky = ky[self.complex_local_slice()[1]]
+
         Ks = np.meshgrid(kx, ky, kz, indexing='ij', sparse=True)
         if scaled:
             Lp = 2*np.pi/self.L
             for i in range(3):
                 Ks[i] *= Lp[i]
-        K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
-        #K = np.array(np.meshgrid(kx, ky, kz, indexing='ij')).astype(self.float)
+        K = Ks
+        if broadcast is True:
+            K = [np.broadcast_to(k, self.complex_shape()) for k in Ks]
         return K
 
     def get_dealias_filter(self):
