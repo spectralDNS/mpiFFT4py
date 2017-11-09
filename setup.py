@@ -9,6 +9,7 @@ from numpy import get_include
 # Version number
 major = 1
 minor = 0
+version = 2
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "mpiFFT4py", "cython")
@@ -32,12 +33,13 @@ ext = cythonize(os.path.join(cdir, "*.pyx"))
 cmdclass = {'build_ext': build_ext_subclass}
 
 setup(name = "mpiFFT4py",
-      version = "%d.%d" % (major, minor),
+      version = "%d.%d.%d" % (major, minor, version),
       description = "mpiFFT4py -- Parallel 3D FFT in Python using MPI for Python",
       long_description = "",
       author = "Mikael Mortensen",
-      author_email = "mikaem@math.uio.no", 
+      author_email = "mikaem@math.uio.no",
       url = 'https://github.com/spectralDNS/mpiFFT4py',
+      download_url = "https://github.com/spectralDNS/mpiFFT4py/archive/mpiFFT4py-1.0.2.tar.gz",
       classifiers = [
           'Development Status :: 5 - Production/Stable',
           'Environment :: Console',

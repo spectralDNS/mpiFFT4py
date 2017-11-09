@@ -63,6 +63,7 @@ __license__ = "GNU Lesser GPL version 3 or any later version"
 from .serialFFT import *
 import numpy as np
 from .mpibase import work_arrays, datatypes
+from .cython.maths import dealias_filter
 from numpy.fft import fftfreq, rfftfreq
 from collections import defaultdict
 from mpi4py import MPI
