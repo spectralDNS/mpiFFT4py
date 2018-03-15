@@ -1,7 +1,10 @@
 # mpiFFT4py
 
 [![Build Status](https://travis-ci.org/spectralDNS/mpiFFT4py.svg?branch=master)](https://travis-ci.org/spectralDNS/mpiFFT4py)
-[![CircleCI](https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master)
+[![CircleCI](https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master
+[![DOI](https://zenodo.org/badge/51817237.svg)](https://zenodo.org/badge/latestdoi/51817237)
+
+
 
 Description
 ----------
