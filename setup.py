@@ -9,7 +9,7 @@ from numpy import get_include
 # Version number
 major = 1
 minor = 0
-version = 2
+version = 3
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "mpiFFT4py", "cython")
