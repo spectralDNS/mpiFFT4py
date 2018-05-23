@@ -1,12 +1,12 @@
 package:
   name: mpifft4py
-  version: "1.0.3"
+  version: "1.1.0"
 
 source:
   git_url: ../../
 
 build:
-  number: 27
+  number: 0
 
 requirements:
   build:
