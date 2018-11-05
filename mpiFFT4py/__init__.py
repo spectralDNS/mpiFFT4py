@@ -5,4 +5,4 @@ from .line import R2C as Line_R2C
 from .mpibase import work_arrays, datatypes, empty, zeros
 from numpy.fft import fftfreq, rfftfreq
 
-__version__ = '1.1.0'
+__version__ = '1.1.1'
