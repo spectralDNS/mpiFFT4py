@@ -70,6 +70,10 @@ setup(name = "mpiFFT4py",
                   "mpiFFT4py.cython"
                   ],
       package_dir = {"mpiFFT4py": "mpiFFT4py"},
+      install_requires=["numpy", "mpi4py", "pyfftw"],
+      setup_requires=["numpy>=1.11",
+                      "cython>=0.25",
+                      "setuptools>=18.0"],
       ext_modules = ext,
       cmdclass = {'build_ext': build_ext_subclass}
     )
