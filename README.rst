@@ -1,17 +1,19 @@
-# mpiFFT4py
+mpiFFT4py
+---------
 
-[![Build Status](https://travis-ci.org/spectralDNS/mpiFFT4py.svg?branch=master)](https://travis-ci.org/spectralDNS/mpiFFT4py)
-[![CircleCI](https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master.svg?style=svg)](https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master)
-[![DOI](https://zenodo.org/badge/51817237.svg)](https://zenodo.org/badge/latestdoi/51817237)
-
-
+.. image:: https://travis-ci.org/spectralDNS/mpiFFT4py.svg?branch=master
+    :target: https://travis-ci.org/spectralDNS/mpiFFT4py
+.. image:: https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master.svg?style=svg
+    :target: https://circleci.com/gh/spectralDNS/mpiFFT4py/tree/master
+.. image:: https://zenodo.org/badge/51817237.svg
+    :target: https://zenodo.org/badge/latestdoi/51817237
 
 Description
-----------
+-----------
 mpiFFT4py performs FFTs in parallel in Python. It is developed to be able to do FFTs in parallel on a three-dimensional computational box (a structured grid), but there are also routines for doing the FFTs on a 2D mesh. It implements both the *slab* and the *pencil* decompositions.
 
 Installation
------------
+------------
 mpiFFT4py requires *numpy* for basic array oparations, [*pyfftw*](https://github.com/pyfftw/pyFFTW) for efficient FFTs and [*mpi4py*](https://bitbucket.org/mpi4py/mpi4py) for MPI communications. However, if *pyfftw* is not found, then the slower *numpy.fft* is used instead. [*cython*](http://cython.org) is used to optimize a few routines. Install using regular python distutils
 
     python setup.py install --prefix="Path on the PYTHONPATH"
