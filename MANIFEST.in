@@ -1,0 +1,2 @@
+include *.py *.txt *.rst
+recursive-include mpiFFT4py *.py *.pyx
