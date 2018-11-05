@@ -42,7 +42,7 @@ def version():
         m = re.search(r"__version__\s*=\s*'(.*)'", f.read())
         return m.groups()[0]
 
-with open("README.md", "r") as fh:
+with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setup(name = "mpiFFT4py",
