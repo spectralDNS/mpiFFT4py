@@ -1,6 +1,6 @@
 package:
   name: mpifft4py
-  version: "{{ GET_DESCRIBE_TAG }}"
+  version: "{{ GIT_DESCRIBE_TAG }}"
 
 source:
   git_url: ../../
