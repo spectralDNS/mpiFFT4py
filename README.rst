@@ -14,25 +14,26 @@ mpiFFT4py performs FFTs in parallel in Python. It is developed to be able to do 
 
 Installation
 ------------
-mpiFFT4py requires *numpy* for basic array oparations, [*pyfftw*](https://github.com/pyfftw/pyFFTW) for efficient FFTs and [*mpi4py*](https://bitbucket.org/mpi4py/mpi4py) for MPI communications. However, if *pyfftw* is not found, then the slower *numpy.fft* is used instead. [*cython*](http://cython.org) is used to optimize a few routines. Install using regular python distutils
+mpiFFT4py requires *numpy* for basic array oparations, [*pyfftw*](https://github.com/pyfftw/pyFFTW) for efficient FFTs and [*mpi4py*](https://bitbucket.org/mpi4py/mpi4py) for MPI communications. However, if *pyfftw* is not found, then the slower *numpy.fft* is used instead. [*cython*](http://cython.org) is used to optimize a few routines. Install using regular python distutils::
 
     python setup.py install --prefix="Path on the PYTHONPATH"
   
-To install in place do
+To install in place do::
 
     python setup.py build_ext --inplace
     
-To install using Anaconda, you may either compile it yourselves using (from the main directory)
+To install using Anaconda, you may either compile it yourselves using (from the main directory)::
 
     conda config --add channels conda-forge
     conda build conf/conda
     conda install mpiFFT4py --use-local
     
-or use precompiled binaries in the[*conda-forge*](https://anaconda.org/conda-forge/mpifft4py) or the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud
+or use precompiled binaries in the[*conda-forge*](https://anaconda.org/conda-forge/mpifft4py) or the [*spectralDNS*](https://anaconda.org/spectralDNS/mpifft4py) channel on Anaconda cloud::
 
     conda install -c conda-forge mpifft4py
 
-or
+or::
+
     conda config --add channels conda-forge
     conda install -c spectralDNS mpifft4py
 
