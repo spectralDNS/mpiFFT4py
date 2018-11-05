@@ -1,45 +1,57 @@
 #!/usr/bin/env python
 
-import os, sys, platform
-from distutils.core import setup, Extension
-from Cython.Distutils import build_ext
-from Cython.Build import cythonize
+import os
+import re
+import subprocess
+from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
 from numpy import get_include
-
-# Version number
-major = 1
-minor = 1
-version = 0
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 cdir = os.path.join(cwd, "mpiFFT4py", "cython")
 
-cmdclass = {}
+def has_flag(compiler, flagname):
+    """Return a boolean indicating whether a flag name is supported on
+    the specified compiler.
+    """
+    devnull = open(os.devnull, "w")
+    p = subprocess.Popen([compiler.compiler[0], '-E', '-'] + [flagname],
+                         stdin=subprocess.PIPE, stdout=devnull, stderr=devnull,
+                         shell=True)
+    p.communicate("")
+    return True if p.returncode == 0 else False
+
 class build_ext_subclass(build_ext):
     def build_extensions(self):
-        extra_compile_args = ['-w', '-Ofast']
-        cmd = "echo | %s -E - %s &>/dev/null" % (
-            self.compiler.compiler[0], " ".join(extra_compile_args))
-        try:
-            subprocess.check_call(cmd, shell=True)
-        except:
-            extra_compile_args = ['-w', '-O3']
+        extra_compile_args = ['-g0']
+        for c in ['-w', '-Ofast', '-ffast-math', '-march=native']:
+            if has_flag(self.compiler, c):
+                extra_compile_args.append(c)
+
         for e in self.extensions:
-            e.extra_compile_args = extra_compile_args
+            e.extra_compile_args += extra_compile_args
+            e.include_dirs.extend([get_include()])
         build_ext.build_extensions(self)
 
-ext = cythonize(os.path.join(cdir, "*.pyx"))
-[e.include_dirs.extend([get_include()]) for e in ext]
-cmdclass = {'build_ext': build_ext_subclass}
+ext = [Extension('mpiFFT4py.cython.maths',
+                 sources=[os.path.join(cdir, "maths.pyx")])]
+
+def version():
+    srcdir = os.path.join(cwd, 'mpiFFT4py')
+    with open(os.path.join(srcdir, '__init__.py')) as f:
+        m = re.search(r"__version__\s*=\s*'(.*)'", f.read())
+        return m.groups()[0]
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(name = "mpiFFT4py",
-      version = "%d.%d.%d" % (major, minor, version),
+      version = version(),
       description = "mpiFFT4py -- Parallel 3D FFT in Python using MPI for Python",
-      long_description = "",
+      long_description = long_description,
       author = "Mikael Mortensen",
       author_email = "mikaem@math.uio.no",
       url = 'https://github.com/spectralDNS/mpiFFT4py',
-      download_url = "https://github.com/spectralDNS/mpiFFT4py/archive/mpiFFT4py-1.1.0.tar.gz",
       classifiers = [
           'Development Status :: 5 - Production/Stable',
           'Environment :: Console',
@@ -47,6 +59,8 @@ setup(name = "mpiFFT4py",
           'Intended Audience :: Science/Research',
           'Intended Audience :: Education',
           'Programming Language :: Python',
+          'Programming Language :: Python :: 2',
+          'Programming Language :: Python :: 3',
           'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
           'Topic :: Scientific/Engineering :: Mathematics',
           'Topic :: Software Development :: Libraries :: Python Modules',
@@ -57,5 +71,5 @@ setup(name = "mpiFFT4py",
                   ],
       package_dir = {"mpiFFT4py": "mpiFFT4py"},
       ext_modules = ext,
-      cmdclass = cmdclass
+      cmdclass = {'build_ext': build_ext_subclass}
     )

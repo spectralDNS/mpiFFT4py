@@ -145,9 +145,9 @@ class R2C(object):
 
     def complex_local_wavenumbers(self):
         """Returns local wavenumbers of complex space"""
-        return (fftfreq(self.N[0], 1./self.N[0]),
-                fftfreq(self.N[1], 1./self.N[1])[self.complex_local_slice()[1]],
-                rfftfreq(self.N[2], 1./self.N[2]))
+        return (fftfreq(self.N[0], 1./self.N[0]).astype(self.float),
+                fftfreq(self.N[1], 1./self.N[1])[self.complex_local_slice()[1]].astype(self.float),
+                rfftfreq(self.N[2], 1./self.N[2]).astype(self.float))
 
     def get_local_mesh(self):
         """Returns the local decomposed physical mesh"""
@@ -170,13 +170,15 @@ class R2C(object):
         """
         kx, ky, kz = self.complex_local_wavenumbers()
         if eliminate_highest_freq:
-            ky = fftfreq(self.N[1], 1./self.N[1])
+            ky = fftfreq(self.N[1], 1./self.N[1].astype(self.float))
             for i, k in enumerate((kx, ky, kz)):
                 if self.N[i] % 2 == 0:
                     k[self.N[i]//2] = 0
             ky = ky[self.complex_local_slice()[1]]
 
         Ks = np.meshgrid(kx, ky, kz, indexing='ij', sparse=True)
+        for i in range(3):
+            Ks[i] = Ks[i].astype(self.float)
         if scaled:
             Lp = 2*np.pi/self.L
             for i in range(3):

@@ -1,6 +1,6 @@
 package:
   name: mpifft4py
-  version: "1.1.0"
+  version: "{{ GET_DESCRIBE_TAG }}"
 
 source:
   git_url: ../../
@@ -19,9 +19,7 @@ requirements:
     - numpy
     - scipy
     - mpi4py
-    - mpich  #[unix]
-    - openmpi ==1.6.3 #[osx]
-    - cython
+    - fftw
     - pyfftw
 
 test:
